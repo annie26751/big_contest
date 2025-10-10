@@ -3,7 +3,7 @@ import os # API 키를 안전하게 관리하기 위해 os 모듈을 import 합�
 from typing import Dict, Any
 
 # ==============================================================================
-GEMINI_API_KEY = "AIzaSyCm9d2tg5Gout-f6NAPXw4zy0M9iGwqLbc"
+GEMINI_API_KEY = "your api key"
 GEMINI_MODEL = "gemini-2.5-flash-preview-05-20"
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 # QUARTILE_MAPPING은 data_processor에서도 사용되지만, 프롬프트 생성 시 필요하여 여기서도 정의합니다.
