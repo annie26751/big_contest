@@ -8,6 +8,7 @@ from data_processor import load_fixed_data, analyze_merchant, FIXED_DATA_PATH, A
 from gemini_api import generate_marketing_text_with_gemini 
 from visualize import load_data
 from visualize import kpi_board, gender_age_pie, customer_type_pie
+from visualization_area import render_area_dashboard
 
 
 @st.cache_resource(ttl=3600)
@@ -59,7 +60,45 @@ def main():
 
     # --- 메인 화면 구성 ---
     # -------------------- 메인 화면 구성 --------------------
-    tab_viz, tab_llm = st.tabs(["📊 시각화", "🤖 AI 마케팅"])
+    tab_viz, tab_llm, tab_area = st.tabs(["📊 시각화", "🤖 AI 마케팅", "📊 상권 분석 시각화"])
+
+    with tab_area:
+        st.subheader("📈 상권 분석 시각화")
+
+        @st.cache_data(ttl=3600, show_spinner=False)
+        def _auto_load_df_filtered():
+            import os
+            base_dir = os.path.dirname(FIXED_DATA_PATH)
+            csv_path = os.path.join(base_dir, "mapping.csv")
+            if not os.path.exists(csv_path):
+                raise FileNotFoundError(f"mapping.csv를 찾을 수 없습니다: {csv_path}")
+
+            # 인코딩 우선순위: utf-8-sig → utf-8
+            try:
+                df = pd.read_csv(csv_path, encoding="utf-8-sig")
+            except UnicodeDecodeError:
+                df = pd.read_csv(csv_path, encoding="utf-8")
+
+            return df, csv_path
+
+        try:
+            df_filtered, src_path = _auto_load_df_filtered()
+            st.caption(f"🔄 자동 로드: **{src_path}** — {len(df_filtered):,}행")
+        except FileNotFoundError as e:
+            st.error(str(e))
+            st.stop()
+        except Exception as e:
+            st.error(f"자동 로드 중 오류가 발생했습니다: {e}")
+            st.stop()
+
+        # 시각화에 필요한 컬럼 점검
+        required_cols = ["행정동_코드_명", "업종_매핑", "점포_수", "유사_업종_점포_수", "개업_율", "폐업_률"]
+        missing = [c for c in required_cols if c not in df_filtered.columns]
+        if missing:
+            st.error(f"시각화에 필요한 컬럼이 없습니다: {missing}")
+            st.stop()
+
+        render_area_dashboard(df_filtered)
 
     with tab_viz:
 
