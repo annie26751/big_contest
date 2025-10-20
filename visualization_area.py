@@ -1,6 +1,3 @@
-# visualization_area.py
-# -*- coding: utf-8 -*-
-
 import os
 import re
 import unicodedata
@@ -12,15 +9,9 @@ import matplotlib
 import matplotlib.pyplot as plt
 import streamlit as st
 
-# ---- 폰트(윈도우) ----
 matplotlib.rcParams["font.family"] = "Malgun Gothic"
 matplotlib.rcParams["axes.unicode_minus"] = False
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 업종 매핑 딕셔너리 (HPSN_MCT_ZCD_NM → 업종_매핑)
-# 필요 시 프로젝트 공통 모듈로 분리해도 됩니다.
-# ─────────────────────────────────────────────────────────────────────────────
 CODE_TO_CUSTOM = {
     "한식음식점": "한식-단품요리일반",
     "중식음식점": "중식당",
@@ -42,10 +33,6 @@ CODE_TO_CUSTOM = {
     "반찬가게": "반찬",
 }
 
-
-# =====================================================================================
-# 공개 API
-# =====================================================================================
 def render_area_dashboard(
     df_filtered: pd.DataFrame,
     selected_mct: str | int | None = None,
@@ -91,10 +78,8 @@ def render_area_dashboard(
 
     st.subheader("📈 상권 분석 시각화")
 
-    # 📘 지표 설명(Glossary)
     _render_metric_glossary()
 
-    # ── 업종 표시/선택 UI ───────────────────────────────────────────
     with st.container(border=True):
         cols = st.columns([5, 2, 2, 2])
 
@@ -123,7 +108,6 @@ def render_area_dashboard(
             else:
                 selected_ind = auto_selected_ind
 
-        # 나머지 옵션
         with cols[1]:
             topN = st.slider("매트릭스 TOP N", 10, 50, 30, 5)
         with cols[2]:
@@ -131,7 +115,6 @@ def render_area_dashboard(
         with cols[3]:
             max_cols = st.slider("히트맵 업종 수", 5, 20, 10, 1)
 
-        # 레이더 스케일 옵션
         col_a, col_b = st.columns(2)
         with col_a:
             scaling_method = st.selectbox(
@@ -152,12 +135,6 @@ def render_area_dashboard(
             dongs = sorted(dfm["행정동_코드_명"].unique().tolist())
             dong_sel = st.multiselect("행정동 선택", dongs, default=[])
 
-    # 디버그(선택)
-    with st.expander("🛠 디버그 (필요할 때만 열어보세요)"):
-        if st.toggle("디버그 정보 보기", value=False):
-            st.json(dbg)
-
-    # ── 시각화 1~3 ─────────────────────────────────────────────────
     st.markdown("### 1) 🎯 성장-안정성 매트릭스")
     _plot_growth_stability_matrix(
         industry_indicators, selected_ind=selected_ind, topN=topN
@@ -168,8 +145,8 @@ def render_area_dashboard(
         industry_indicators,
         selected_ind=selected_ind,
         k_top=k_top,
-        scaling_method=scaling_method,  # 옵션 반영
-        scope=scope,                    # 옵션 반영
+        scaling_method=scaling_method,  
+        scope=scope,                    
     )
 
     st.markdown("### 3) 🗺️ 상권(행정동) × 업종_매핑 히트맵")
@@ -180,11 +157,6 @@ def render_area_dashboard(
         max_cols=max_cols,
         dong_filter=dong_sel,
     )
-
-
-# =====================================================================================
-# 내부 유틸/계산
-# =====================================================================================
 
 def _validate_columns(df, req):
     miss = [c for c in req if c not in df.columns]
@@ -199,9 +171,9 @@ def _norm_label(x: str) -> str:
         return ""
     s = str(x)
     s = unicodedata.normalize("NFKC", s)
-    s = s.replace("\ufeff", "")  # BOM
-    s = re.sub(r"[\u200B-\u200D\uFEFF]", "", s)  # zero-width
-    s = " ".join(s.strip().split())  # 양끝/중간 공백 정리
+    s = s.replace("\ufeff", "") 
+    s = re.sub(r"[\u200B-\u200D\uFEFF]", "", s) 
+    s = " ".join(s.strip().split())  
     return s
 
 
@@ -255,10 +227,6 @@ def _render_metric_glossary():
     df_gloss = pd.DataFrame(data, columns=["지표", "계산 방법", "의미"])
     st.dataframe(df_gloss, use_container_width=True, hide_index=True)
 
-
-# =====================================================================================
-# 자동 매핑 (사전 → 직접 일치)
-# =====================================================================================
 
 @st.cache_data(show_spinner=False)
 def _auto_pick_industry_by_mct_smart(
@@ -577,7 +545,6 @@ def _plot_heatmap(
     ax.set_title("상권(행정동) × 업종_매핑 — 평균 추천점수(근사)", fontsize=13, fontweight="bold", pad=10)
     cbar = plt.colorbar(im, ax=ax); cbar.set_label("추천점수(근사, 높을수록 우수)", fontsize=10, fontweight="bold")
 
-    # 셀 값 표시(가독성 제한)
     if len(pivot.index) * len(pivot.columns) <= 600:
         for i in range(pivot.shape[0]):
             for j in range(pivot.shape[1]):
@@ -587,7 +554,6 @@ def _plot_heatmap(
 
     st.pyplot(fig_h)
 
-    # CSV 다운로드
     csv_bytes = pivot.reset_index().to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
     st.download_button(
         "⬇️ 히트맵 피벗 CSV 다운로드",
