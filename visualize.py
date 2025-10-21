@@ -23,7 +23,7 @@ def load_data(path: Path = DATA_PATH) -> pd.DataFrame:
         df['TA_YM_DT'] = pd.to_datetime(df['TA_YM_DT'].astype(str).str[:7] + '-01', errors='coerce')
     return df
 
-# ── KPI 보드 시각화 ────────────────────────────────────────────
+# -------------------- KPI 보드 -------------------- #
 def kpi_board(df: pd.DataFrame, selected_mct: str, REF: pd.Timestamp | None = None):
     df_mct = df[df['ENCODED_MCT'] == selected_mct].copy()
     if df_mct.empty:
@@ -90,7 +90,6 @@ def kpi_board(df: pd.DataFrame, selected_mct: str, REF: pd.Timestamp | None = No
         cards.append((labels[col], now[col], dv, col))
 
     fig, axes = plt.subplots(1, len(cards), figsize=(13, 3.4))
-    fig.suptitle(f"{REF:%Y-%m} 전월대비 성과", fontsize=15, weight='bold')
 
     if len(cards) == 1:
         axes = [axes]
@@ -116,23 +115,20 @@ def kpi_board(df: pd.DataFrame, selected_mct: str, REF: pd.Timestamp | None = No
     plt.tight_layout(rect=[0, 0, 1, 0.90])
     st.pyplot(fig)
 
-# ── 성별 도넛 차트 ────────────────────────────────────────────
+# -------------------- 성별/연령 도넛 -------------------- #
 def gender_age_pie(df: pd.DataFrame, selected_mct: str, REF: pd.Timestamp | None = None):
     df_mct = df[df['ENCODED_MCT'] == selected_mct].copy()
     if df_mct.empty:
         st.warning(f"가맹점 데이터가 없습니다: {selected_mct}")
         return
 
-    # 날짜 컬럼 처리
     if 'TA_YM_DT' in df_mct.columns and not np.issubdtype(df_mct['TA_YM_DT'].dtype, np.datetime64):
         df_mct['TA_YM_DT'] = pd.to_datetime(df_mct['TA_YM_DT'].astype(str).str[:7] + '-01', errors='coerce')
 
-    # 기준월 결정
     if REF is None:
         REF = df_mct['TA_YM_DT'].max()
     REF = pd.to_datetime(REF)
 
-    # 성별·연령 컬럼
     cols = [
         'M12_MAL_1020_RAT','M12_MAL_30_RAT','M12_MAL_40_RAT','M12_MAL_50_RAT','M12_MAL_60_RAT',
         'M12_FME_1020_RAT','M12_FME_30_RAT','M12_FME_40_RAT','M12_FME_50_RAT','M12_FME_60_RAT'
@@ -142,77 +138,166 @@ def gender_age_pie(df: pd.DataFrame, selected_mct: str, REF: pd.Timestamp | None
         '여≤20','여30','여40','여50','여60+'
     ]
 
-    # 선택월 데이터 평균
     tmp = df_mct.loc[df_mct['TA_YM_DT'] == REF, cols].mean().fillna(0)
     vals = tmp.values
+    if np.isnan(vals).all() or vals.sum() == 0:
+        st.warning(f"{REF:%Y-%m} 기준 데이터가 없습니다.")
+        return
+
     total = vals.sum()
-    if total > 0 and (total < 95 or total > 105):  # 합이 100% 아닌 경우 보정
+    if total > 0 and (total < 95 or total > 105):
         vals = vals / total * 100
 
-    # 색상 팔레트 (남=파랑, 여=빨강)
     colors = [
-        '#1e40af', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd',   # 남
-        '#b91c1c', '#dc2626', '#ef4444', '#f87171', '#fca5a5'    # 여
+        '#1e40af', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd',
+        '#b91c1c', '#dc2626', '#ef4444', '#f87171', '#fca5a5'
     ]
 
-    # 도넛 차트
-    fig, ax = plt.subplots(figsize=(3.5,3.5))
+    fig, ax = plt.subplots(figsize=(5, 5))
     wedges, texts, autotexts = ax.pie(
         vals, labels=labels, autopct='%1.0f%%',
         startangle=90, counterclock=False,
-        wedgeprops={'width':0.35, 'edgecolor':'white'},
-        colors=colors, pctdistance=0.8
+        wedgeprops={'width': 0.4, 'edgecolor': 'white'},
+        colors=colors, pctdistance=0.75,
+        radius=0.9
     )
 
-    plt.setp(autotexts, size=10, weight='bold', color='white')
-    ax.set_title(f"{REF:%Y-%m} 기준 성별·연령 고객 구성", fontsize=14, weight='semibold')
-    plt.tight_layout()
+    plt.setp(autotexts, size=9, weight='bold', color='white')
+    ax.set_title("성별/연령", fontsize=12, weight='semibold', pad=20)
+    ax.set_xlim(-1.3, 1.3)
+    ax.set_ylim(-1.3, 1.3)
+    
+    plt.subplots_adjust(left=0.05, right=0.75, top=0.9, bottom=0.1)
     st.pyplot(fig)
 
-# ── 고객 유형 도넛 차트 ────────────────────────────────────────────
-def customer_type_pie(df: pd.DataFrame, selected_mct: str, REF: pd.Timestamp | None = None):
+
+# -------------------- 재방문/신규 도넛 -------------------- #
+def customer_type_pie_revisit_new(df: pd.DataFrame, selected_mct: str,
+                                  REF: pd.Timestamp | None = None,
+                                  return_fig: bool = False):
     df_mct = df[df['ENCODED_MCT'] == selected_mct].copy()
     if df_mct.empty:
-        st.warning(f"가맹점 데이터가 없습니다: {selected_mct}")
+        if not return_fig:
+            st.warning(f"가맹점 데이터가 없습니다: {selected_mct}")
         return
 
-    # 날짜 컬럼 처리
     if 'TA_YM_DT' in df_mct.columns and not np.issubdtype(df_mct['TA_YM_DT'].dtype, np.datetime64):
         df_mct['TA_YM_DT'] = pd.to_datetime(df_mct['TA_YM_DT'].astype(str).str[:7] + '-01', errors='coerce')
-
-    # 기준월 결정
     if REF is None:
         REF = df_mct['TA_YM_DT'].max()
     REF = pd.to_datetime(REF)
 
-    # 컬럼 및 레이블 정의
-    cols_left  = ['MCT_UE_CLN_REU_RAT','MCT_UE_CLN_NEW_RAT']
-    cols_right = ['RC_M1_SHC_RSD_UE_CLN_RAT','RC_M1_SHC_WP_UE_CLN_RAT','RC_M1_SHC_FLP_UE_CLN_RAT']
-    labels_left  = ['재방문','신규']
-    labels_right = ['거주','직장','유동']
+    # ✅ 기준월 자체가 NaT인 경우 가드
+    if pd.isna(REF):
+        if not return_fig: st.warning("기준월(REF) 정보가 없습니다.")
+        return
 
-    # 선택월 평균값 계산 및 합이 100% 아닌 경우 보정
-    L = df_mct.loc[df_mct['TA_YM_DT']==REF, cols_left].mean().fillna(0)
-    R = df_mct.loc[df_mct['TA_YM_DT']==REF, cols_right].mean().fillna(0)
-    L = L if L.sum()==0 else L/L.sum()*100
-    R = R if R.sum()==0 else R/R.sum()*100
+    cols = ['MCT_UE_CLN_REU_RAT','MCT_UE_CLN_NEW_RAT']
+    labels = ['재방문','신규']
 
-    # 색상 팔레트
-    left_colors  = ['#0ea5e9','#94a3b8']      # 재방문 파랑, 신규 회색블루
-    right_colors = ['#22c55e','#f59e0b','#64748b']  # 거주 초록, 직장 앰버, 유동 슬레이트
+    # ✅ 기준월 행 비었는지 먼저 체크
+    df_ref = df_mct.loc[df_mct['TA_YM_DT']==REF, cols]
+    if df_ref.empty:
+        if not return_fig: st.warning(f"{REF:%Y-%m} 기준 데이터가 없습니다.")
+        return
 
-    # 좌측 도넛
-    fig, ax = plt.subplots(figsize=(3.5,3.5))
-    ax.pie(L.values, labels=labels_left, autopct='%1.0f%%', startangle=90,
-           wedgeprops={'width':0.35,'edgecolor':'white'}, colors=left_colors, pctdistance=0.8)
-    ax.set_title(f'{REF:%Y-%m} 재방문 vs 신규', fontsize=12, weight='semibold')
-    plt.tight_layout()
+    # ✅ NaN/0 합 가드 → vals만들고 합이 0이면 리턴
+    L = df_ref.mean(numeric_only=True).astype(float).fillna(0.0)
+    vals = L.values.astype(float)
+    total = np.nansum(vals)
+    if np.isnan(vals).all() or total <= 0:
+        if not return_fig: st.warning(f"{REF:%Y-%m} 기준 값이 없습니다.")
+        return
+    vals = np.asarray(vals, dtype=float)             # 1) 배열 보장
+    vals = np.nan_to_num(vals, nan=0.0,             # 2) NaN/inf → 0
+                        posinf=0.0, neginf=0.0)
+    if vals.size == 0:                               # 3) 빈 배열 가드
+        if not return_fig: st.warning(f"{REF:%Y-%m} 기준 값이 없습니다.")
+        return
+    total = vals.sum()                               # 4) 합이 0 가드
+    if total <= 0:
+        if not return_fig: st.warning(f"{REF:%Y-%m} 기준 값이 없습니다.")
+        return
+    vals = vals / total * 100.0
+
+    colors = ['#0ea5e9',"#63DC45"]
+    fig, ax = plt.subplots(figsize=(5, 5))
+    wedges, texts, autotexts = ax.pie(
+        vals, labels=labels, autopct='%1.0f%%', startangle=90,
+        wedgeprops={'width':0.4,'edgecolor':'white'}, colors=colors, pctdistance=0.75,
+        radius=0.9, labeldistance=1.05
+    )
+    plt.setp(autotexts, size=9, weight='bold', color='white')
+    plt.setp(texts, size=9)
+    ax.set_title('재방문/신규', fontsize=12, weight='semibold', pad=20)
+    ax.set_xlim(-1.3, 1.3); ax.set_ylim(-1.3, 1.3)
+    plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
+
+    if return_fig: return fig
     st.pyplot(fig)
 
-    # 우측 도넛
-    fig, ax = plt.subplots(figsize=(3.5,3.5))
-    ax.pie(R.values, labels=labels_right, autopct='%1.0f%%', startangle=90,
-           wedgeprops={'width':0.35,'edgecolor':'white'}, colors=right_colors, pctdistance=0.8)
-    ax.set_title(f'{REF:%Y-%m} 거주/직장/유동', fontsize=12, weight='semibold')
-    plt.tight_layout()
+
+# -------------------- 거주/직장/유동 도넛 -------------------- #
+def customer_type_pie_origin(df: pd.DataFrame, selected_mct: str,
+                             REF: pd.Timestamp | None = None,
+                             return_fig: bool = False):
+    df_mct = df[df['ENCODED_MCT'] == selected_mct].copy()
+    if df_mct.empty:
+        if not return_fig:
+            st.warning(f"가맹점 데이터가 없습니다: {selected_mct}")
+        return
+
+    if 'TA_YM_DT' in df_mct.columns and not np.issubdtype(df_mct['TA_YM_DT'].dtype, np.datetime64):
+        df_mct['TA_YM_DT'] = pd.to_datetime(df_mct['TA_YM_DT'].astype(str).str[:7] + '-01', errors='coerce')
+    if REF is None:
+        REF = df_mct['TA_YM_DT'].max()
+    REF = pd.to_datetime(REF)
+
+    # ✅ 기준월 자체 가드
+    if pd.isna(REF):
+        if not return_fig: st.warning("기준월(REF) 정보가 없습니다.")
+        return
+
+    cols = ['RC_M1_SHC_RSD_UE_CLN_RAT','RC_M1_SHC_WP_UE_CLN_RAT','RC_M1_SHC_FLP_UE_CLN_RAT']
+    labels = ['거주','직장','유동']
+
+    # ✅ 기준월 데이터 유무 가드
+    df_ref = df_mct.loc[df_mct['TA_YM_DT']==REF, cols]
+    if df_ref.empty:
+        if not return_fig: st.warning(f"{REF:%Y-%m} 기준 데이터가 없습니다.")
+        return
+
+    # ✅ NaN/0 합 가드
+    R = df_ref.mean(numeric_only=True).astype(float).fillna(0.0)
+    vals = R.values.astype(float)
+    total = np.nansum(vals)
+    if np.isnan(vals).all() or total <= 0:
+        if not return_fig: st.warning(f"{REF:%Y-%m} 기준 값이 없습니다.")
+        return
+    vals = np.asarray(vals, dtype=float)             # 1) 배열 보장
+    vals = np.nan_to_num(vals, nan=0.0,             # 2) NaN/inf → 0
+                        posinf=0.0, neginf=0.0)
+    if vals.size == 0:                               # 3) 빈 배열 가드
+        if not return_fig: st.warning(f"{REF:%Y-%m} 기준 값이 없습니다.")
+        return
+    total = vals.sum()                               # 4) 합이 0 가드
+    if total <= 0:
+        if not return_fig: st.warning(f"{REF:%Y-%m} 기준 값이 없습니다.")
+        return
+    vals = vals / total * 100.0
+
+    colors = ['#63DC45',"#0ea5e9",'#f59e0b']
+    fig, ax = plt.subplots(figsize=(5, 5))
+    wedges, texts, autotexts = ax.pie(
+        vals, labels=labels, autopct='%1.0f%%', startangle=90,
+        wedgeprops={'width':0.4,'edgecolor':'white'}, colors=colors, pctdistance=0.75,
+        radius=0.9, labeldistance=1.05
+    )
+    plt.setp(autotexts, size=9, weight='bold', color='white')
+    plt.setp(texts, size=9)
+    ax.set_title('거주/직장/유동', fontsize=12, weight='semibold', pad=20)
+    ax.set_xlim(-1.3, 1.3); ax.set_ylim(-1.3, 1.3)
+    plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
+
+    if return_fig: return fig
     st.pyplot(fig)
