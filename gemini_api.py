@@ -1,29 +1,25 @@
 import requests
-import os 
-from typing import Dict, Any, List 
+import os
+from typing import Dict, Any, List
 
-# ==============================================================================
-GEMINI_API_KEY = "AIzaSyCm9d2tg5Gout-f6NAPXw4zy0M9iGwqLbc"
-GEMINI_MODEL = "gemini-2.0-flash"
+# — API 설정 —
+GEMINI_API_KEY = "AIzaSyD18eAdaAvP7FB-Dzp5ZbGNcIln8h-umOc" 
+GEMINI_MODEL = "gemini-2.5-flash"
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 
-
-QUARTILE_MAPPING = {
-    '10%이하': '상위 10%', '10-25%': '상위 10-25%', '25-50%': '중위 25-50%',
-    '50-75%': '하위 50-75%', '75-90%': '하위 75-90%', '90%초과': '하위 90% 초과'
-}
 
 def generate_marketing_text_with_gemini(
     analysis_summary: Dict[str, Any],
     persona_info: Dict[str, Any],
     mbti_result: Dict[str, str],
     mct_id: str
-):
+) -> str:
+    """Gemini API를 호출하여 페르소나 및 가게 유형 기반 마케팅 제안 텍스트를 생성합니다."""
 
-    if "YOUR_API_KEY_HERE" in GEMINI_API_KEY:
-        return "### 🚨 API 키 설정 필요\n.env 파일에 Gemini API 키를 설정해주세요."
+    if "YOUR_GEMINI_API_KEY" in GEMINI_API_KEY:
+        return "### 🚨 API 키 설정 필요\n`gemini_api.py` 파일에서 `GEMINI_API_KEY`를 실제 키로 변경해주세요."
 
-    # 1. 시스템 프롬프트
+    # 1. 시스템 프롬프트 
     system_prompt = (
         "당신은 대한민국 소상공인을 위한 최고의 마케팅 컨설턴트 AI입니다. "
         "제공된 [가게 유형], [핵심 진단], [핵심 고객 페르소나] 정보를 종합적으로 분석하여, "
@@ -33,7 +29,7 @@ def generate_marketing_text_with_gemini(
 
     # 2. 사용자 프롬프트 
     user_prompt = f"""
-    ###  분석 대상 가맹점: {mct_id}
+    ### 분석 대상 가맹점: {mct_id}
 
     #### [가게 유형 분석]
     - **우리 가게 유형:** {mbti_result['name']} ({mbti_result['description']})
@@ -49,7 +45,7 @@ def generate_marketing_text_with_gemini(
     - **찾는 이유(Goals):** {', '.join(persona_info['goals'])}
     - **어려움(Pain Points):** {', '.join(persona_info['pain_points'])}
 
-    ---
+    —
     ### [요청 사항]
     위 모든 정보를 바탕으로, 이 가게의 **강점은 극대화**하고 **약점은 보완**할 수 있는 맞춤형 마케팅 전략을 아래 형식에 맞춰 제안해주세요.
 
@@ -62,7 +58,7 @@ def generate_marketing_text_with_gemini(
         - **홍보 문구 예시:** (고객 페르소나의 눈길을 사로잡을 SNS 또는 문자 메시지 예시)
     """
 
-    # 3. API Payload 구성 및 호출
+    # 3. API Payload 구성 및 호출 (단일 프롬프트)
     payload = {
         "contents": [{"parts": [{"text": user_prompt}]}],
         "systemInstruction": {
@@ -88,26 +84,27 @@ def generate_marketing_text_with_gemini(
         return f"🚨 응답 처리 중 알 수 없는 오류가 발생했습니다: {e}"
 
 
-
-def generate_chat_response_with_gemini(base_context: str, messages_history: List[Dict[str, str]]):
+def generate_chat_response_with_gemini(base_context: str, messages_history: List[Dict[str, str]]) -> str:
     """
     AI와 후속 대화를 생성합니다. (REST API 방식)
     base_context: 상점 요약, 페르소나, 원본 전략 등 기본 정보
-    messages_history: [{"role": "user", ...}, {"role": "assistant", ...}] 형식의 리스트
+    messages_history: [{"role": "user", …}, {"role": "assistant", …}] 형식의 리스트
     """
     
+    # 1. 시스템 프롬프트
     system_prompt_text = f"""
-    당신은 상권 분석 및 마케팅 전문 AI 어시턴트입니다. 
+    당신은 상권 분석 및 마케팅 전문 AI 어시스턴트입니다. 
     사용자는 방금 다음 기본 정보를 바탕으로 마케팅 전략을 생성했습니다:
-    ---
+    —
     [기본 분석 정보 및 원본 전략]
     {base_context}
-    ---
+    —
 
     이제 사용자가 이 전략에 대해 추가 질문을 하고 있습니다. 
     이어지는 대화 내용을 바탕으로 사용자의 마지막 질문에 친절하고 전문적으로 답변해주세요.
     """
     
+    # 2. Streamlit의 대화 기록을 API가 이해할 수 있도록 변환
     api_contents = []
     for msg in messages_history:
         api_role = "model" if msg["role"] == "assistant" else "user"

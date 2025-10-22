@@ -1,12 +1,20 @@
+# data_processor.property
+
 import pandas as pd
 import numpy as np
 import os
 from collections import Counter
 from typing import Dict, Any
+
+# --- 모듈에서 필요한 함수와 상수를 가져옵니다 --- #
 from persona_generator import create_persona
 from mbti_classifier import classify_merchant_mbti
 
+# ==============================================================================
+# --- 상수 정의 ---
+# ==============================================================================
 FIXED_DATA_PATH = "./data/merged_data.csv"
+
 STATIC_COLS = [
     'MCT_BSE_AR', 'MCT_SIGUNGU_NM', 'HPSN_MCT_ZCD_NM', 'HPSN_MCT_BZN_CD_NM',
     'ARE_D', 'MCT_ME_D'
@@ -64,8 +72,9 @@ def load_fixed_data(path):
     df_raw = pd.read_csv(path, encoding='cp949')
     return preprocess_data(df_raw)
 
-
-# --- 가맹점 통합 분석 함수 ---
+# ==============================================================================
+# --- 🌟 가맹점 통합 분석 함수 ---
+# ==============================================================================
 def analyze_merchant(merchant_row: pd.Series) -> Dict[str, Any]:
     """선택된 가맹점의 모든 분석(진단, 페르소나, MBTI)을 수행합니다."""
 
@@ -97,6 +106,11 @@ def analyze_merchant(merchant_row: pd.Series) -> Dict[str, Any]:
     # --- 2. 페르소나 및 가게 유형 분석 ---
     persona_info = create_persona(merchant_row, summary_data)
     mbti_info = classify_merchant_mbti(merchant_row)
+
+    # [수정] image_url이 없는 경우를 대비하여 고정된 대체 이미지 URL을 추가합니다.
+    if 'image_url' not in persona_info:
+        persona_info['image_url'] = "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=1888&auto=format&fit=crop"
+
 
     # --- 3. 최종 결과 종합 ---
     return {

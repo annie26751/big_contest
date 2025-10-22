@@ -1,3 +1,5 @@
+# app.py
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -126,32 +128,26 @@ def main():
 
 
     # -------------------- 가맹점 기본 정보 블록 -------------------- #
-    if "analysis_result" in st.session_state and st.session_state["analysis_result"] is not None:
-        summary = st.session_state["analysis_result"]["summary"]
-        static_info = summary["static_info"]
-
-        with st.sidebar.expander("📂 가게 정보", expanded=True):
-            status = "운영 중" if pd.isna(static_info.get("MCT_ME_D")) else f"폐업 ({static_info.get('MCT_ME_D')})"
-
-            st.markdown(f"**업종:** {static_info.get('HPSN_MCT_ZCD_NM')}")
-            st.markdown(f"**주소:** {static_info.get('MCT_BSE_AR')}")
-            st.markdown(f"**상권:** {static_info.get('HPSN_MCT_BZN_CD_NM', '정보 없음')}")
-            st.markdown(f"**상태:** {status}")
-    else:
-        st.sidebar.info("가맹점을 선택하면 기본 정보가 표시됩니다.")    
-
     if selected_mct:
-        # df_profile에서 현재 선택된 가맹점 1행 추출
-        merchant_row = df_profile[df_profile["ENCODED_MCT"] == selected_mct].iloc[0]
+        try:
+            row = df_profile.loc[df_profile["ENCODED_MCT"].astype(str) == str(selected_mct)].iloc[0]
+        except IndexError:
+            st.sidebar.info("선택한 가맹점의 기본 정보를 찾을 수 없습니다.")
+        else:
+            with st.sidebar.expander("📂 가게 정보", expanded=True):
+                status = "운영 중" if pd.isna(row.get("MCT_ME_D")) else f"폐업 ({row.get('MCT_ME_D')})"
+                st.markdown(f"**업종:** {row.get('HPSN_MCT_ZCD_NM')}")
+                st.markdown(f"**주소:** {row.get('MCT_BSE_AR')}")
+                st.markdown(f"**상권:** {row.get('HPSN_MCT_BZN_CD_NM', '정보 없음')}")
+                st.markdown(f"**상태:** {status}")
 
-        # MBTI(가게 유형) 분류
-        store_type = classify_merchant_mbti(merchant_row)
-
-        with st.sidebar.expander("🏪 가게 유형 (MBTI)", expanded=True):
-            st.markdown(f"**{store_type['name']}**")
-            st.caption(store_type['description'])
+            # MBTI(가게 유형) 분류 — 기존 UI 유지
+            store_type = classify_merchant_mbti(row)
+            with st.sidebar.expander("🏪 가게 유형 (MBTI)", expanded=True):
+                st.markdown(f"**{store_type['name']}**")
+                st.caption(store_type['description'])
     else:
-        st.sidebar.info("가맹점을 선택하면 가게 유형이 표시됩니다.")
+        st.sidebar.info("가맹점을 선택하면 기본 정보와 가게 유형이 표시됩니다.")
 
     # -------------------- 기준월 선택 -------------------- #
     st.session_state["selected_mct"] = selected_mct
@@ -412,70 +408,64 @@ def main():
             reel_tab, blog_tab, image_tab = st.tabs(["🎬 **릴스/숏폼 제작**", "✍️ **블로그 포스팅**", "🎨 **이미지 생성**"])
 
             with reel_tab:
-                st.link_button(
-                    "Vrew 바로가기", 
-                    "https://vrew.voyagerx.com/",
-                    help="영상과 음성을 분석해 자동으로 자막을 생성하고, 텍스트 편집만으로 영상을 손쉽게 컷 편집할 수 있는 도구입니다."
-                )
+                st.markdown("""
+                ### 🔹 Vrew  
+                텍스트만 입력하면 자동으로 이미지, 영상 클립, 더빙까지 생성해주는 영상 제작 도구입니다. 릴스나 쇼츠 콘텐츠를 제작해 보세요!
+                사이트: `https://vrew.voyagerx.com/`
+                """)
                 with st.expander("📝 **Vrew 활용 프롬프트 예시 펼쳐보기**"):
                     st.code(f"""
                     ### 릴스 대본 생성 프롬프트
-    
+
                     **역할:**
                     당신은 '{summary['static_info'].get('HPSN_MCT_ZCD_NM')}' 가게를 운영하는 사장님 역할을 맡은 SNS 마케터입니다.
                     우리의 핵심 고객인 '{persona['name']}'의 관심을 끌 수 있는 30초 분량의 인스타그램 릴스 대본을 작성해주세요.
-    
+
                     **릴스 컨셉:**
                     [사장님이 직접 가게의 매력을 소개하는 컨셉 / 고객이 직접 경험하는 듯한 1인칭 시점 컨셉 등]
-    
+
                     **핵심 메시지:**
                     '{persona['goals'][0]}' 와 같은 고객의 니즈를 충족시키고, '{persona['pain_points'][0]}' 같은 불편함을 해결해준다는 점을 강조해주세요.
-    
+
                     **포함할 내용:**
                     - 시선을 사로잡는 오프닝 멘트 (3초 이내)
                     - 가게의 핵심 메뉴 또는 서비스 소개
                     - 고객에게 제공하는 특별한 혜택 (이벤트, 할인 등)
                     - 행동 유도 문구 (예: "지금 바로 프로필 링크를 확인하세요!")
                     - 영상 장면에 대한 간단한 설명 (예: #1. 음식이 클로즈업되는 장면)
-    
+
                     **분위기:**
                     [활기찬 / 감성적인 / 유머러스한] 분위기로 작성해주세요.
                     """, language="markdown")
 
+            # ✍️ 블로그 탭
             with blog_tab:
-                b_cols = st.columns(2)
-                with b_cols[0]:
-                    st.link_button(
-                        "Gemini 바로가기", 
-                        "https://gemini.google.com/",
-                        help="강력한 대규모 언어 모델(LLM)을 활용하여 전문적인 블로그 포스트를 손쉽게 작성할 수 있습니다.",
-                        use_container_width=True
-                    )
-                with b_cols[1]:
-                    st.link_button(
-                        "뤼튼(Wrtn) 블로그", 
-                        "https://wrtn.ai/tools/67b2e7901b44a4d864b127a5",
-                        help="다양한 글쓰기 도구를 제공하는 한국형 AI 포털입니다. 블로그 포스팅에 특화된 툴을 활용할 수 있습니다.",
-                        use_container_width=True
-                    )
+                st.markdown("""
+                ### 🔹 Gemini  
+                강력한 AI 비서로 완성도 높은 블로그 글을 손쉽게 작성할 수 있어요!
+                            사이트: `https://gemini.google.com/`
                 
+                ### 🔹 뤼튼(Wrtn) 블로그  
+                게시물의 주제, 말투를 설정하면 블로그 글을 자동으로 완성해 드려요!  
+                사이트: `https://wrtn.ai/tools/67b2e7901b44a4d864b127a5`
+                """)
                 with st.expander("📝 **블로그 포스팅용 프롬프트 예시 펼쳐보기**"):
                     st.code(f"""
                     ### 블로그 포스트 생성 프롬프트
-    
+
                     **역할:**
                     당신은 '{summary['static_info'].get('HPSN_MCT_BZN_CD_NM')}' 상권의 맛집을 소개하는 전문 블로거입니다.
-    
+
                     **주제:**
                     '{summary['static_info'].get('HPSN_MCT_ZCD_NM')}' 가게 방문 후기
-    
+
                     **타겟 독자:**
                     '{persona['name']}' ({persona['description']})
-    
+
                     **글의 목적:**
                     타겟 독자가 이 글을 읽고 우리 가게에 방문하고 싶게 만드는 것.
                     특히, '{persona['goals'][0]}'와 같은 독자의 목표를 우리 가게가 어떻게 만족시켜주는지 자연스럽게 녹여내 주세요.
-    
+
                     **포함할 내용:**
                     1.  독자의 흥미를 유발하는 제목 (SEO 키워드: [지역명] 맛집, [업종명])
                     2.  가게의 첫인상 및 분위기 묘사
@@ -483,34 +473,26 @@ def main():
                     4.  '{persona['pain_points'][0]}'과 같은 독자의 불편함을 우리 가게가 어떻게 해결해주는지에 대한 포인트 강조
                     5.  가게 위치, 운영 시간, 팁 등 방문 정보
                     6.  독자의 방문을 유도하는 마무리 문단
-    
+
                     **글의 톤앤매너:**
                     [친근하고 솔직한 / 전문적이고 신뢰감 있는] 톤앤매너로 작성해주세요.
                     """, language="markdown")
 
+            # 🎨 이미지 생성 탭
             with image_tab:
-                i_cols = st.columns(3)
-                with i_cols[0]:
-                    st.link_button(
-                        "뤼튼(Wrtn) 이미지", 
-                        "https://wrtn.ai/tools/67b2e7901b44a4d864b127b9",
-                        help="한국어 프롬프트에 강점을 보이는 AI 포털로, 손쉽게 원하는 이미지를 생성할 수 있습니다.",
-                        use_container_width=True
-                    )
-                with i_cols[1]:
-                    st.link_button(
-                        "Hailo AI", 
-                        "https://hailuoai.video/ko/agent",
-                        help="AI 에이전트를 활용하여 다양한 스타일의 이미지를 생성하고 편집할 수 있는 도구입니다.",
-                        use_container_width=True
-                    )
-                with i_cols[2]:
-                    st.link_button(
-                        "Gemini 이미지", 
-                        "https://gemini.google.com/app",
-                        help="Google의 Gemini를 통해서도 프롬프트를 입력하여 이미지를 생성할 수 있습니다.",
-                        use_container_width=True
-                    )
+                st.markdown("""
+                ### 🔹 뤼튼(Wrtn) 이미지  
+                한국어에 강한 AI로, 손쉽게 원하는 이미지를 생성할 수 있어요! 
+                사이트: `https://wrtn.ai/tools/67b2e7901b44a4d864b127b9`
+
+                ### 🔹 Hailo AI  
+                AI 에이전트를 활용하여 다양한 스타일의 이미지와 영상을 생성하고 편집할 수 있어요!
+                사이트: `https://hailuoai.video/ko/agent`
+
+                ### 🔹 플레이그라운드(로고) 
+                간단한 입력만으로 원하는 이미지를 내 가게의 로고로 만들 수 있어요!  
+                사이트: `https://playground.com/design/c/logo`
+                """)
 
                 with st.expander("📝 **이미지 생성 프롬프트 예시 펼쳐보기**"):
                     st.code(f"""
