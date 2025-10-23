@@ -136,7 +136,7 @@ def main():
                 status = "운영 중" if pd.isna(row.get("MCT_ME_D")) else f"폐업 ({row.get('MCT_ME_D')})"
                 st.markdown(f"**업종:** {row.get('HPSN_MCT_ZCD_NM')}")
                 st.markdown(f"**주소:** {row.get('MCT_BSE_AR')}")
-                st.markdown(f"**상권:** {row.get('HPSN_MCT_BZN_CD_NM', '정보 없음')}")
+                st.markdown(f"**상권:** {row.get('h_name', row.get('HPSN_MCT_BZN_CD_NM'))}")
                 st.markdown(f"**상태:** {status}")
 
             # MBTI(가게 유형) 분류 — 기존 UI 유지
@@ -255,19 +255,19 @@ def main():
 
         # 패턴/해석/주요 업종
         with st.container(border=True):
-            st.markdown("**패턴 분석**")
-            for line in report["pattern"]:
-                st.markdown(f"- {line}")
-            st.markdown("**해석**")
-            st.write(report["interpretation"])
-            st.markdown("**주요 업종**")
+            st.write(report["pattern"])
             st.write(report["key_industries"])
+            st.write(report["interpretation"])
+            
 
-        # 미리 만든 그래프 이미지가 있으면 표시 (예: static/cluster_{id}_top10.png)
-        if "chart_path" in report and os.path.exists(report["chart_path"]):
-            st.image(report["chart_path"], caption="동군집 내 상위 10개 업종 분포", use_column_width=True)
+        # 그래프 이미지
+        imgs = report.get("images", [])
+        if imgs:
+            st.markdown("**같은 그룹의 상위 10개 업종이에요**")
+            for p in imgs:
+                st.image(p, caption=os.path.basename(p), use_container_width=True)
         else:
-            st.caption("차트 이미지가 준비되지 않았음.. (static 폴더 경로/파일명 확인)")
+            st.caption("이미지가 없어요. (data/plots 경로/파일명을 확인하세요)")
 
         # 메타
         st.caption(f"모델: {report['meta']['model_ver']} · 소스: {report['meta']['data_source']}")
@@ -302,10 +302,10 @@ def main():
 
         # KPI 비교 차트
         df = load_data()
-        st.subheader("📊 전월 대비 성과")
+        st.subheader("📊 저번 달과 이만큼 달라요")
         kpi_board(df, selected_mct, REF=selected_ref)
         st.markdown("---")
-        st.subheader("👥 고객 구성")
+        st.subheader("👥 우리 가게를 찾은 손님들")
         st.write("") 
 
         col1, col2, col3 = st.columns([1, 1, 1], gap="medium")
@@ -495,7 +495,7 @@ def main():
                     ### 블로그 포스트 생성 프롬프트
 
                     **역할:**
-                    당신은 '{summary['static_info'].get('HPSN_MCT_BZN_CD_NM')}' 상권의 맛집을 소개하는 전문 블로거입니다.
+                    당신은 '{summary['static_info'].get('h_name', row.get('HPSN_MCT_BZN_CD_NM'))}' 상권의 맛집을 소개하는 전문 블로거입니다.
 
                     **주제:**
                     '{summary['static_info'].get('HPSN_MCT_ZCD_NM')}' 가게 방문 후기
@@ -551,7 +551,7 @@ def main():
                     디테일이 뛰어나고 따뜻하며 매력적인 조명에 초점을 맞출 것.
 
                     **핵심 키워드:**
-                    맛있는 음식, 행복한 고객, {summary['static_info'].get('HPSN_MCT_BZN_CD_NM')}, 라이프스타일, 고품질
+                    맛있는 음식, 행복한 고객, {summary['static_info'].get('h_name', row.get('HPSN_MCT_BZN_CD_NM'))}, 라이프스타일, 고품질
                     """, language="markdown")
 
             st.markdown("---")

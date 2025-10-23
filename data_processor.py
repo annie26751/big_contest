@@ -55,12 +55,24 @@ def get_mode_or_first(series):
 def preprocess_data(df: pd.DataFrame):
     df[MEAN_COLS_FOR_AGG] = df[MEAN_COLS_FOR_AGG].apply(pd.to_numeric, errors='coerce')
     df = df.replace(SV_VALUE, np.nan)
+    
+    if 'h_name' in df.columns:
+        df['h_name'] = (
+            df['h_name']
+            .astype(str)
+            .str.replace(r'\s+', ' ', regex=True)  # 다중 공백 정리
+            .str.strip()
+            .str.split(' ')
+            .str[-1]
+        )
+    
     df_static = df.groupby('ENCODED_MCT')[STATIC_COLS].first().reset_index()
     df_avg = df.groupby('ENCODED_MCT')[MEAN_COLS_FOR_AGG].mean().reset_index()
     agg_quartile_funcs = {col: get_mode_or_first for col in QUARTILE_METRIC_COLS}
     df_quartile = df.groupby('ENCODED_MCT').agg(agg_quartile_funcs).reset_index()
     df_final = pd.merge(df_static, df_avg, on='ENCODED_MCT', how='left')
     df_final = pd.merge(df_final, df_quartile, on='ENCODED_MCT', how='left')
+    
     return df_final
 
 def load_fixed_data(path):
