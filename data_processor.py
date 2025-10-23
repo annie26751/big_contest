@@ -13,11 +13,12 @@ from mbti_classifier import classify_merchant_mbti
 # ==============================================================================
 # --- 상수 정의 ---
 # ==============================================================================
-FIXED_DATA_PATH = "./data/merged_data.csv"
+FIXED_DATA_PATH = "./data/data_dong.csv"
 
 STATIC_COLS = [
-    'MCT_BSE_AR', 'MCT_SIGUNGU_NM', 'HPSN_MCT_ZCD_NM', 'HPSN_MCT_BZN_CD_NM',
-    'ARE_D', 'MCT_ME_D'
+    'MCT_BSE_AR', 'h_name', 'HPSN_MCT_ZCD_NM', 'HPSN_MCT_BZN_CD_NM', 
+    'ARE_D', 'MCT_ME_D',
+    'MCT_NM', 'lat', 'lng', 'h_code' 
 ]
 QUARTILE_METRIC_COLS = [
     'MCT_OPE_MS_CN', 'RC_M1_SAA', 'RC_M1_TO_UE_CT',
@@ -69,7 +70,7 @@ def preprocess_data(df: pd.DataFrame):
 def load_fixed_data(path):
     if not os.path.exists(path):
         raise FileNotFoundError(f"❌ 파일 없음: `{path}`")
-    df_raw = pd.read_csv(path, encoding='cp949')
+    df_raw = pd.read_csv(path, encoding='utf-8')
     return preprocess_data(df_raw)
 
 # ==============================================================================
