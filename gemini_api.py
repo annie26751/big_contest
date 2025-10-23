@@ -7,12 +7,22 @@ GEMINI_API_KEY = "AIzaSyD18eAdaAvP7FB-Dzp5ZbGNcIln8h-umOc"
 GEMINI_MODEL = "gemini-2.5-flash"
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 
+import requests
+import os
+from typing import Dict, Any, List
+
+# — API 설정 —
+GEMINI_API_KEY = "AIzaSyD18eAdaAvP7FB-Dzp5ZbGNcIln8h-umOc" 
+GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
+
 
 def generate_marketing_text_with_gemini(
     analysis_summary: Dict[str, Any],
     persona_info: Dict[str, Any],
     mbti_result: Dict[str, str],
-    mct_id: str
+    mct_id: str,
+    override_target: Dict[str, str] = None  # 👈 [수정 1] 새 인자를 받도록 수정
 ) -> str:
     """Gemini API를 호출하여 페르소나 및 가게 유형 기반 마케팅 제안 텍스트를 생성합니다."""
 
@@ -27,6 +37,36 @@ def generate_marketing_text_with_gemini(
         "친절하고 이해하기 쉬운 전문가의 말투를 사용해주세요."
     )
 
+    # ----------------------------------------------------------------- #
+    # ⬇️ [수정 2] 페르소나 프롬프트 부분을 조건부로 생성 (이 부분이 핵심!) ⬇️
+    # ----------------------------------------------------------------- #
+    if override_target:
+        # 사용자가 타겟을 직접 설정한 경우
+        target_gender = override_target.get('gender', '지정 안함')
+        target_age = override_target.get('age', '지정 안함')
+        target_type = override_target.get('type', '지정 안함')
+
+        persona_prompt_block = f"""
+    #### [핵심 고객 페르소나 (사용자 직접 설정)]
+    - **타겟 성별:** {target_gender}
+    - **타겟 나이:** {target_age}
+    - **타겟 유형:** {target_type} 고객
+    
+    (참고: 위 타겟은 사장님이 직접 선정한 '집중 공략 타겟'입니다. 이 고객의 니즈에 100% 맞춘 전략을 수립해주세요.)
+    """
+    else:
+        # 기본값 (데이터 기반 페르소나)
+        persona_prompt_block = f"""
+    #### [핵심 고객 페르소나 (데이터 기반)]
+    - **이름:** {persona_info['name']}
+    - **특징:** {persona_info['description']}
+    - **찾는 이유(Goals):** {', '.join(persona_info['goals'])}
+    - **어려움(Pain Points):** {', '.join(persona_info['pain_points'])}
+    """
+    # ----------------------------------------------------------------- #
+    # ⬆️ [수정 2] 여기까지 ⬆️
+    # ----------------------------------------------------------------- #
+
     # 2. 사용자 프롬프트 
     user_prompt = f"""
     ### 분석 대상 가맹점: {mct_id}
@@ -39,11 +79,7 @@ def generate_marketing_text_with_gemini(
     - **고객 유지력:** {analysis_summary['retention_analysis_text']}
     - **경쟁 환경:** {analysis_summary['comp_analysis_text']}
 
-    #### [핵심 고객 페르소나]
-    - **이름:** {persona_info['name']}
-    - **특징:** {persona_info['description']}
-    - **찾는 이유(Goals):** {', '.join(persona_info['goals'])}
-    - **어려움(Pain Points):** {', '.join(persona_info['pain_points'])}
+    {persona_prompt_block}  # 👈 [수정 3] 조건부로 생성된 프롬프트 블록을 여기에 삽입
 
     —
     ### [요청 사항]
@@ -76,13 +112,16 @@ def generate_marketing_text_with_gemini(
             text = result['candidates'][0].get('content', {}).get('parts', [{}])[0].get('text', '오류: 응답 내용이 비어있습니다.')
             return text
         else:
-            return f"### 🚨 API 응답 오류\n응답 형식에 'candidates'가 없습니다. API 키와 모델명을 확인해주세요.\n\n**응답 내용:**\n```json\n{result}\n```"
+            # API 키 오류 또는 모델명 오류 시 상세 내용 출력
+            error_details = result.get('error', {})
+            if error_details:
+                return f"### 🚨 API 설정 오류\n- **코드:** {error_details.get('code')}\n- **메시지:** {error_details.get('message')}\n\nAPI 키가 유효한지, `{GEMINI_MODEL}` 모델을 사용할 권한이 있는지 확인하세요."
+            return f"### 🚨 API 응답 오류\n응답 형식에 'candidates'가 없습니다.\n\n**응답 내용:**\n```json\n{result}\n```"
 
     except requests.exceptions.RequestException as e:
         return f"🚨 API 호출 중 네트워크 오류가 발생했습니다: {e}"
     except Exception as e:
         return f"🚨 응답 처리 중 알 수 없는 오류가 발생했습니다: {e}"
-
 
 def generate_chat_response_with_gemini(base_context: str, messages_history: List[Dict[str, str]]) -> str:
     """

@@ -382,14 +382,57 @@ def main():
         st.markdown("---")
 
         st.subheader("🧠 AI 비밀상담사의 맞춤형 마케팅 플랜")
-        st.warning("아래는 입력된 데이터와 페르소나를 기반으로 Gemini AI 마케팅 전략을 실시간으로 생성합니다.")
+        st.markdown("아래는 입력된 데이터와 페르소나를 기반으로 Gemini AI 마케팅 전략을 실시간으로 생성합니다.")
         
+        with st.expander("🎯 (선택) 타겟 페르소나 직접 설정하기", expanded=False):
+            st.info("특정 고객층을 대상으로 전략을 생성하고 싶다면, 아래에서 직접 페르소나(타겟)을 설정하세요.")
+            
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                target_gender = st.selectbox(
+                    "성별", 
+                    ["데이터 기반", "남성", "여성","남성 및 여성"], 
+                    key="target_gender_select"
+                )
+            with c2:
+                # 사용자가 요청한 '10대'를 '10-20대'로 통합
+                target_age = st.selectbox(
+                    "나이", 
+                    ["데이터 기반", "10-20대", "30대", "40대", "50대", "60대 이상"], 
+                    key="target_age_select"
+                )
+            with c3:
+                # 사용자가 요청한 '가족'을 데이터의 '거주'와 매핑
+                target_cust_type = st.selectbox(
+                    "고객 유형", 
+                    ["데이터 기반", "직장인", "유동인구", "가족/거주"], 
+                    key="target_type_select"
+                )
+                
         _, btn_col, _ = st.columns([1, 2, 1])
         with btn_col:
             button_text = "🚀 생성중..." if st.session_state.generating else "🚀 AI 마케팅 전략 생성하기"
             if st.button(button_text, use_container_width=True, type="primary", disabled=st.session_state.generating):
                 st.session_state.generating = True
-                proposal = generate_marketing_text_with_gemini(summary, persona, mbti_result, selected_mct)
+                
+                override_target = {}
+                if target_gender != "데이터 기반":
+                    override_target['gender'] = target_gender
+                if target_age != "데이터 기반":
+                    override_target['age'] = target_age
+                if target_cust_type != "데이터 기반":
+                    if target_cust_type == "거주":
+                        override_target['type'] = "거주"
+                    else:
+                        override_target['type'] = target_cust_type 
+                        
+                proposal = generate_marketing_text_with_gemini(
+                    summary, 
+                    persona, 
+                    mbti_result, 
+                    selected_mct, 
+                    override_target=override_target if override_target else None
+                )
                 st.session_state['marketing_proposal'] = proposal
                 st.session_state.chat_messages = []
                 st.session_state.generating = False
