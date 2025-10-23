@@ -278,7 +278,7 @@ def main():
                 st.session_state["marketing_proposal"] = ""
                 st.session_state["show_mbti_description"] = False
     # 2️⃣ 탭 선언
-    tab_llm, tab_viz, tab_area, tab_clu = st.tabs(["🤖 AI 마케팅", "📊 월별 보고서", "📍 상권 보고서", "❤️ 업장 보고서"])
+    tab_llm, tab_viz, tab_area, tab_clu = st.tabs(["🤖 AI 마케팅", "📊 월별 보고서", "📍 업종 보고서", "❤️ 업장 보고서"])
 
     # 3️⃣ 안전 가드
     if (
