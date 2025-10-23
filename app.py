@@ -411,7 +411,7 @@ def main():
                 st.markdown("""
                 ### 🔹 Vrew  
                 텍스트만 입력하면 자동으로 이미지, 영상 클립, 더빙까지 생성해주는 영상 제작 도구입니다. 릴스나 쇼츠 콘텐츠를 제작해 보세요!
-                사이트: `https://vrew.voyagerx.com/`
+                `https://vrew.voyagerx.com/`
                 """)
                 with st.expander("📝 **Vrew 활용 프롬프트 예시 펼쳐보기**"):
                     st.code(f"""
@@ -443,11 +443,11 @@ def main():
                 st.markdown("""
                 ### 🔹 Gemini  
                 강력한 AI 비서로 완성도 높은 블로그 글을 손쉽게 작성할 수 있어요!
-                            사이트: `https://gemini.google.com/`
+                `https://gemini.google.com/`
                 
                 ### 🔹 뤼튼(Wrtn) 블로그  
                 게시물의 주제, 말투를 설정하면 블로그 글을 자동으로 완성해 드려요!  
-                사이트: `https://wrtn.ai/tools/67b2e7901b44a4d864b127a5`
+                `https://wrtn.ai/tools/67b2e7901b44a4d864b127a5`
                 """)
                 with st.expander("📝 **블로그 포스팅용 프롬프트 예시 펼쳐보기**"):
                     st.code(f"""
@@ -483,15 +483,15 @@ def main():
                 st.markdown("""
                 ### 🔹 뤼튼(Wrtn) 이미지  
                 한국어에 강한 AI로, 손쉽게 원하는 이미지를 생성할 수 있어요! 
-                사이트: `https://wrtn.ai/tools/67b2e7901b44a4d864b127b9`
+                `https://wrtn.ai/tools/67b2e7901b44a4d864b127b9`
 
                 ### 🔹 Hailo AI  
                 AI 에이전트를 활용하여 다양한 스타일의 이미지와 영상을 생성하고 편집할 수 있어요!
-                사이트: `https://hailuoai.video/ko/agent`
+                `https://hailuoai.video/ko/agent`
 
                 ### 🔹 플레이그라운드(로고) 
                 간단한 입력만으로 원하는 이미지를 내 가게의 로고로 만들 수 있어요!  
-                사이트: `https://playground.com/design/c/logo`
+                `https://playground.com/design/c/logo`
                 """)
 
                 with st.expander("📝 **이미지 생성 프롬프트 예시 펼쳐보기**"):

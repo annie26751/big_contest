@@ -1,14 +1,19 @@
 # visualize.py
+
 import pandas as pd
 import numpy as np
 import matplotlib
-import matplotlib.pyplot as plt
 import streamlit as st
 from pathlib import Path
+import matplotlib.pyplot as plt
+from matplotlib import font_manager, rcParams
 
-# 한글 설정
-matplotlib.rcParams['font.family'] = 'Malgun Gothic'
-matplotlib.rcParams['axes.unicode_minus'] = False
+font_path = Path(__file__).parent / "NanumGothic.ttf"
+font_manager.fontManager.addfont(str(font_path))
+
+# 한글 폰트 설정
+rcParams["font.family"] = "NanumGothic"
+rcParams["axes.unicode_minus"] = False
 
 # 데이터 경로
 DATA_PATH = Path('./data/data_dong.csv')
