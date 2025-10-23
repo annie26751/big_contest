@@ -7,22 +7,13 @@ GEMINI_API_KEY = "AIzaSyD18eAdaAvP7FB-Dzp5ZbGNcIln8h-umOc"
 GEMINI_MODEL = "gemini-2.5-flash"
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 
-import requests
-import os
-from typing import Dict, Any, List
-
-# — API 설정 —
-GEMINI_API_KEY = "AIzaSyD18eAdaAvP7FB-Dzp5ZbGNcIln8h-umOc" 
-GEMINI_MODEL = "gemini-2.5-flash"
-GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
-
 
 def generate_marketing_text_with_gemini(
     analysis_summary: Dict[str, Any],
     persona_info: Dict[str, Any],
     mbti_result: Dict[str, str],
     mct_id: str,
-    override_target: Dict[str, str] = None  # 👈 [수정 1] 새 인자를 받도록 수정
+    override_target: Dict[str, str] = None  
 ) -> str:
     """Gemini API를 호출하여 페르소나 및 가게 유형 기반 마케팅 제안 텍스트를 생성합니다."""
 
@@ -37,9 +28,6 @@ def generate_marketing_text_with_gemini(
         "친절하고 이해하기 쉬운 전문가의 말투를 사용해주세요."
     )
 
-    # ----------------------------------------------------------------- #
-    # ⬇️ [수정 2] 페르소나 프롬프트 부분을 조건부로 생성 (이 부분이 핵심!) ⬇️
-    # ----------------------------------------------------------------- #
     if override_target:
         # 사용자가 타겟을 직접 설정한 경우
         target_gender = override_target.get('gender', '지정 안함')
@@ -63,9 +51,6 @@ def generate_marketing_text_with_gemini(
     - **찾는 이유(Goals):** {', '.join(persona_info['goals'])}
     - **어려움(Pain Points):** {', '.join(persona_info['pain_points'])}
     """
-    # ----------------------------------------------------------------- #
-    # ⬆️ [수정 2] 여기까지 ⬆️
-    # ----------------------------------------------------------------- #
 
     # 2. 사용자 프롬프트 
     user_prompt = f"""
