@@ -19,7 +19,6 @@ font_manager.fontManager.addfont(str(font_path))
 rcParams["font.family"] = "NanumGothic"
 rcParams["axes.unicode_minus"] = False
 
-
 CODE_TO_CUSTOM = {
     "한식음식점": "한식-단품요리일반",
     "중식음식점": "중식당",
@@ -143,13 +142,50 @@ def render_area_dashboard(
             dongs = sorted(dfm["행정동_코드_명"].unique().tolist())
             dong_sel = st.multiselect("행정동 선택", dongs, default=[])
 
-    st.markdown("### 1) 🎯 성장-안정성 매트릭스")
+    st.markdown("#### 1) 🎯 성장-안정성 매트릭스")
     _plot_growth_stability_matrix(
         industry_indicators, selected_ind=selected_ind, topN=topN
     )
 
-    st.write("")
-    st.markdown("### 2) 🛡️ 레이더 차트 (업종_매핑 비교)")
+    st.markdown("#### 2) 🛡️ 레이더 차트 (업종_매핑 비교)")
+    
+    # 레이더 차트 설정 설명
+    with st.expander("ℹ️ 레이더 차트 설정 가이드", expanded=False):
+        st.markdown("""
+        **🔧 레이더 스케일 방법**
+        
+        레이더 차트의 각 축을 0~100 범위로 변환하는 방법을 선택합니다:
+        
+        - **robust-minmax**: 극단값의 영향을 줄이는 방법
+          - 10% 분위수(하위 10%)와 90% 분위수(상위 10%)를 기준으로 스케일링
+          - 이상치(outlier)가 있어도 차트가 안정적으로 표시됨
+          - **추천**: 데이터에 극단적인 값이 있을 때 유용
+        
+        - **zscore**: 평균과 표준편차를 기준으로 변환
+          - 평균을 50으로, ±5 표준편차를 0~100으로 매핑
+          - 통계적으로 표준화된 비교가 가능
+          - **추천**: 정규분포를 따르는 일반적인 데이터에 적합
+        
+        ---
+        
+        **🎯 스케일 참조 범위**
+        
+        축의 0~100 스케일을 계산할 때 어떤 데이터를 기준으로 할지 선택합니다:
+        
+        - **global**: 전체 업종을 기준으로 스케일링
+          - 모든 업종의 데이터를 포함하여 최소/최대값 또는 평균/표준편차 계산
+          - 업종 간 절대적 비교가 가능
+          - **추천**: 전체 시장에서의 상대적 위치를 파악할 때
+        
+        - **compare-set**: 현재 비교 중인 업종들만 기준으로 스케일링
+          - 레이더에 표시되는 k개 업종의 데이터만으로 스케일 계산
+          - 선택된 업종들 간의 상대적 차이가 더 명확하게 표시됨
+          - **추천**: 유사한 업종끼리 세밀하게 비교할 때
+        
+        💡 **팁**: 처음에는 `robust-minmax` + `global` 조합으로 전체적인 모습을 파악한 후, 
+        `compare-set`으로 변경하여 선택 업종들 간의 미세한 차이를 확인하는 것을 추천합니다.
+        """)
+    
     _plot_radar(
         industry_indicators,
         selected_ind=selected_ind,
@@ -158,7 +194,7 @@ def render_area_dashboard(
         scope=scope,                    
     )
 
-    st.markdown("### 3) 🗺️ 상권(행정동) × 업종_매핑 히트맵")
+    st.markdown("#### 3) 🗺️ 상권(행정동) × 업종_매핑 히트맵")
     _plot_heatmap(
         dfm,
         industry_indicators,
@@ -243,145 +279,192 @@ def _auto_pick_industry_by_mct_smart(
     base_dir: str,
     mapping_values: list[str],
     code_to_custom: dict,
-) -> tuple[str | None, str | None, dict]:
-    """
-    반환:
-      mapped_label : 업종_매핑(시각화용) 또는 None
-      raw_industry_name : data_dong.csv의 HPSN_MCT_ZCD_NM 또는 None
-      debug : 중간 디버그 정보(dict)
-    매핑 순서:
-      1) CODE_TO_CUSTOM 사전 매핑 (raw→mapped)
-      2) mapping.csv의 업종_매핑 값들과 직접 일치 (정규화 후 비교)
-    """
-    debug = {}
+):
+    """data_dong.csv에서 ENCODED_MCT별 업종명 → 업종_매핑 자동 선택"""
+    debug_info = {}
     csv_path = os.path.join(base_dir, "data_dong.csv")
     if not os.path.exists(csv_path):
-        debug["error"] = f"data_dong.csv not found: {csv_path}"
-        return None, None, debug
+        debug_info["error"] = f"data_dong.csv not found at {csv_path}"
+        return None, None, debug_info
 
     try:
-        df_dong = pd.read_csv(csv_path, encoding="utf-8-sig")
-    except UnicodeDecodeError:
-        df_dong = pd.read_csv(csv_path, encoding="utf-8")
+        df_dong = pd.read_csv(csv_path, encoding="utf-8-sig", low_memory=False)
     except Exception as e:
-        debug["error"] = f"read error: {e}"
-        return None, None, debug
+        debug_info["error"] = f"data_dong.csv read error: {e}"
+        return None, None, debug_info
 
-    if "ENCODED_MCT" not in df_dong.columns or "HPSN_MCT_ZCD_NM" not in df_dong.columns:
-        debug["error"] = "missing columns in data_dong.csv"
-        return None, None, debug
+    if "ENCODED_MCT" not in df_dong.columns or "업종" not in df_dong.columns:
+        debug_info["error"] = "data_dong.csv missing required columns"
+        return None, None, debug_info
 
-    df_dong["_ENC_MCT_STR"] = df_dong["ENCODED_MCT"].astype(str)
-    key = str(selected_mct)
-    row = df_dong.loc[df_dong["_ENC_MCT_STR"] == key]
+    df_dong["ENCODED_MCT"] = df_dong["ENCODED_MCT"].astype(str).str.strip()
+    selected_mct_str = str(selected_mct).strip()
+    debug_info["selected_mct"] = selected_mct_str
 
-    if row.empty:
-        debug["error"] = f"no row for ENCODED_MCT={key}"
-        return None, None, debug
+    mask = df_dong["ENCODED_MCT"] == selected_mct_str
+    if not mask.any():
+        debug_info["error"] = f"ENCODED_MCT={selected_mct_str} not found"
+        return None, None, debug_info
 
-    raw_name = row["HPSN_MCT_ZCD_NM"].iloc[0]
-    raw_norm = _norm_label(raw_name)
-    debug["raw_name"] = raw_name
-    debug["raw_norm"] = raw_norm
+    raw_name = df_dong.loc[mask, "업종"].iloc[0]
+    debug_info["raw_industry"] = raw_name
 
-    # 1) 사전 매핑 (키 정규화)
-    dict_norm = { _norm_label(k): v for k, v in code_to_custom.items() }
-    if raw_norm in dict_norm:
-        mapped = dict_norm[raw_norm]
-        debug["via"] = "dict"
-        debug["mapped"] = mapped
-        return mapped, raw_name, debug
+    candidates = []
+    for mv in mapping_values:
+        mv_norm = _norm_label(mv)
+        raw_norm = _norm_label(raw_name)
 
-    # 2) mapping.csv의 업종_매핑 값들과 직접 일치(정규화)
-    mapping_norm_to_orig = {}
-    for v in mapping_values:
-        vn = _norm_label(v)
-        mapping_norm_to_orig.setdefault(vn, v)
+        if mv_norm == raw_norm:
+            candidates.append((mv, 1000))
+        elif mv_norm in raw_norm:
+            candidates.append((mv, 800 + len(mv_norm) * 10))
+        elif raw_norm in mv_norm:
+            candidates.append((mv, 600 + len(raw_norm) * 10))
 
-    if raw_norm in mapping_norm_to_orig:
-        mapped = mapping_norm_to_orig[raw_norm]
-        debug["via"] = "direct"
-        debug["mapped"] = mapped
-        return mapped, raw_name, debug
+        for code_key, custom_val in code_to_custom.items():
+            code_norm = _norm_label(code_key)
+            custom_norm = _norm_label(custom_val)
+            if raw_norm == code_norm and mv_norm == custom_norm:
+                candidates.append((mv, 900))
+            elif code_norm in raw_norm and mv_norm == custom_norm:
+                candidates.append((mv, 700))
 
-    # 실패
-    debug["via"] = "none"
-    return None, raw_name, debug
+    debug_info["candidates"] = candidates
+    if not candidates:
+        return None, raw_name, debug_info
+
+    candidates_sorted = sorted(candidates, key=lambda x: x[1], reverse=True)
+    best = candidates_sorted[0][0]
+    debug_info["best_match"] = best
+    return best, raw_name, debug_info
 
 
 # =====================================================================================
-# Plot 1: 성장–안정 매트릭스
+# Plot 1: 성장-안정성 매트릭스 (수정됨)
 # =====================================================================================
 
-def _plot_growth_stability_matrix(ind_df: pd.DataFrame, selected_ind: str | None, topN: int):
+def _plot_growth_stability_matrix(
+    ind_df: pd.DataFrame,
+    selected_ind: str | None,
+    topN: int,
+):
     if ind_df.empty:
         st.warning("업종 집계 데이터가 비어 있습니다.")
         return
 
-    mat_df = ind_df.sort_values("총점포수", ascending=False).head(topN)
+    mat_df = ind_df.nlargest(topN, "종합추천점수")
 
-    fig, ax = plt.subplots(figsize=(7, 5))
-    sizes = (mat_df["총점포수"] / mat_df["총점포수"].max() * 600) + 60
-    colors = mat_df["종합추천점수"]
-
+    fig, ax = plt.subplots(figsize=(3.5, 2.8))
+    
+    # 모든 점 표시 (회색)
     sc = ax.scatter(
         mat_df["평균순증가율"],
         mat_df["평균안정성점수"],
-        s=sizes,
-        c=colors,
-        cmap="RdYlGn",
-        alpha=0.7,
-        edgecolors="black",
-        linewidth=0.8,
+        s=((mat_df["총점포수"] / mat_df["총점포수"].max()) * 400) + 50,
+        c=mat_df["종합추천점수"],
+        cmap="viridis",
+        alpha=0.6,
+        edgecolors="gray",
+        linewidths=0.8,
     )
 
-    # 사분면 기준선
-    avg_g = ind_df["평균순증가율"].mean()
-    avg_s = ind_df["평균안정성점수"].mean()
-    ax.axvline(avg_g, color="gray", linestyle="--", linewidth=1, alpha=0.6)
-    ax.axhline(avg_s, color="gray", linestyle="--", linewidth=1, alpha=0.6)
+    # 4분할 기준선
+    x_mean = mat_df["평균순증가율"].mean()
+    y_mean = mat_df["평균안정성점수"].mean()
+    ax.axvline(x_mean, color="gray", linestyle="--", linewidth=1, alpha=0.5)
+    ax.axhline(y_mean, color="gray", linestyle="--", linewidth=1, alpha=0.5)
 
-    # 코너 라벨
-    xmin, xmax = mat_df["평균순증가율"].min(), mat_df["평균순증가율"].max()
-    ymin, ymax = mat_df["평균안정성점수"].min(), mat_df["평균안정성점수"].max()
+    xmin, xmax = ax.get_xlim()
+    ymin, ymax = ax.get_ylim()
+
+    # 사분면 이름
+    corner_font = dict(fontsize=7, alpha=0.9)
     ax.text(xmax, ymax, "고성장·고안정", ha="right", va="top",
-            bbox=dict(boxstyle="round", facecolor="#c8e6c9", alpha=0.6))
+            bbox=dict(boxstyle="round,pad=0.2", facecolor="#c8e6c9", alpha=0.5), **corner_font)
     ax.text(xmin, ymax, "저성장·고안정", ha="left", va="top",
-            bbox=dict(boxstyle="round", facecolor="#bbdefb", alpha=0.6))
+            bbox=dict(boxstyle="round,pad=0.2", facecolor="#bbdefb", alpha=0.5), **corner_font)
     ax.text(xmax, ymin, "고성장·저안정", ha="right", va="bottom",
-            bbox=dict(boxstyle="round", facecolor="#ffe082", alpha=0.6))
+            bbox=dict(boxstyle="round,pad=0.2", facecolor="#ffe082", alpha=0.5), **corner_font)
     ax.text(xmin, ymin, "저성장·저안정", ha="left", va="bottom",
-            bbox=dict(boxstyle="round", facecolor="#ffcdd2", alpha=0.6))
+            bbox=dict(boxstyle="round,pad=0.2", facecolor="#ffcdd2", alpha=0.5), **corner_font)
 
-    # 상위 5 라벨
+
+    # 상위 5개 라벨
     for ind, row in mat_df.nlargest(5, "종합추천점수").iterrows():
-        label = ind if len(ind) <= 12 else ind[:12] + "…"
+        label = ind if len(ind) <= 10 else ind[:10] + "…"
         ax.annotate(
             label,
             xy=(row["평균순증가율"], row["평균안정성점수"]),
-            xytext=(6, 6),
+            xytext=(3, 3),
             textcoords="offset points",
-            fontsize=9,
-            bbox=dict(boxstyle="round,pad=0.25", facecolor="yellow", alpha=0.5),
-            arrowprops=dict(arrowstyle="->", lw=0.6),
+            fontsize=6.5,
+            bbox=dict(boxstyle="round,pad=0.15", facecolor="yellow", alpha=0.4),
+            arrowprops=dict(arrowstyle="->", lw=0.5),
         )
 
-    # 자동/수동 선택 업종 하이라이트
+    # 선택 업종 하이라이트
     if selected_ind and selected_ind in mat_df.index:
         r = mat_df.loc[selected_ind]
+        point_size = ((r["총점포수"] / mat_df["총점포수"].max()) * 400) + 50
         ax.scatter(
-            r["평균순증가율"], r["평균안정성점수"],
-            s=((r["총점포수"] / mat_df["총점포수"].max()) * 900) + 100,
-            facecolors="none", edgecolors="blue", linewidths=2.5,
-            label=f"선택: {selected_ind}",
+            r["평균순증가율"], 
+            r["평균안정성점수"],
+            s=point_size,
+            facecolors="none", 
+            edgecolors="blue", 
+            linewidths=2.5,
+            zorder=5
         )
-        ax.legend(loc="best")
+        from matplotlib.lines import Line2D
+        legend_elements = [
+            Line2D([0], [0], marker='o', color='w', 
+                   markerfacecolor='none', markeredgecolor='blue', 
+                   markersize=8, markeredgewidth=2.5,
+                   label=f'선택: {selected_ind}')
+        ]
+        ax.legend(handles=legend_elements, loc="lower right", fontsize=6,
+                  frameon=True, framealpha=0.95, edgecolor="blue")
 
-    ax.set_xlabel("순증가율 (%)", fontsize=12, fontweight="bold")
-    ax.set_ylabel("사업안정성점수", fontsize=12, fontweight="bold")
-    cb = fig.colorbar(sc, ax=ax); cb.set_label("종합추천점수", fontsize=10, fontweight="bold")
-    ax.grid(True, alpha=0.3)
+    ax.set_xlabel("순증가율 (%)", fontsize=6, fontweight="bold", labelpad=2)
+    ax.set_ylabel("사업안정성점수", fontsize=6, fontweight="bold", labelpad=2)
+    cb = fig.colorbar(sc, ax=ax, fraction=0.046, pad=0.02)
+    cb.set_label("종합추천점수", fontsize=7)
+    ax.grid(True, alpha=0.25, linewidth=0.5)
+
+    plt.tight_layout(pad=0.4)
     st.pyplot(fig)
+    
+    # 선택된 업종의 사분면 위치에 따른 설명 표시
+    if selected_ind and selected_ind in mat_df.index:
+        r = mat_df.loc[selected_ind]
+        growth = r["평균순증가율"]
+        stability = r["평균안정성점수"]
+        
+        # 사분면 판단
+        if growth >= x_mean and stability >= y_mean:
+            quadrant = "고성장·고안정"
+            description = "안정적이며 성장 여력도 큰 시장입니다. 진입하기 유망한 업종으로, 시장이 확대되고 있으면서도 기존 사업자들의 폐업률이 낮아 안정적인 운영이 가능합니다."
+            color = "#2e7d32"
+        elif growth < x_mean and stability >= y_mean:
+            quadrant = "저성장·고안정"
+            description = "성장은 낮지만 안정적인 업종입니다. 급격한 성장보다는 꾸준한 운영이 중요하며, 유지·보수형 전략이 적합합니다. 기존 고객층 확보가 중요합니다."
+            color = "#1565c0"
+        elif growth >= x_mean and stability < y_mean:
+            quadrant = "고성장·저안정"
+            description = "빠르게 성장 중이나 변동성이 높은 업종입니다. 높은 수익 기회가 있지만 리스크 관리가 필수적입니다. 시장 트렌드 변화에 민감하게 대응해야 합니다."
+            color = "#ef6c00"
+        else:  # growth < x_mean and stability < y_mean
+            quadrant = "저성장·저안정"
+            description = "성장성과 안정성이 모두 낮은 업종입니다. 진입 전 신중한 검토가 필요하며, 차별화된 경쟁력이나 틈새 시장 전략이 있어야 성공 가능성이 높아집니다."
+            color = "#c62828"
+        
+        st.markdown(f"""
+        <div style="padding: 15px; border-left: 4px solid {color}; background-color: #f8f9fa; border-radius: 5px; margin-top: 10px;">
+            <h4 style="color: {color}; margin-top: 0;">📍 선택 업종 '{selected_ind}'의 위치: {quadrant}</h4>
+            <p style="margin-bottom: 0; line-height: 1.6;">{description}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
 
 
 # =====================================================================================
@@ -462,7 +545,7 @@ def _plot_radar(
     angles = [n / float(num_vars) * 2 * pi for n in range(num_vars)]
     angles += angles[:1]
 
-    fig, ax = plt.subplots(figsize=(9, 9), subplot_kw=dict(projection="polar"))
+    fig, ax = plt.subplots(figsize=(6, 2), subplot_kw=dict(projection="polar"))
     for ind in compare_list:
         row = ind_df.loc[ind, cols]
         scaled = _apply_scale(row, a, b, scaling_method)
@@ -479,14 +562,13 @@ def _plot_radar(
         ax.fill(angles, values, alpha=0.15)
 
     ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(categories, fontsize=11)
+    ax.set_xticklabels(categories, fontsize=5)
     ax.set_ylim(0, 100)
     ax.set_yticks([20, 40, 60, 80, 100])
-    ax.set_yticklabels(["20", "40", "60", "80", "100"], fontsize=9)
+    ax.set_yticklabels(["20", "40", "60", "80", "100"], fontsize=5)
     ax.grid(True)
-    ax.legend(loc="upper right", bbox_to_anchor=(1.35, 1.10), fontsize=9)
-    ax.set_title(f"레이더 차트 — {title}", fontsize=14, fontweight="bold", pad=22)
-    st.pyplot(fig)
+    ax.legend(loc="upper right", bbox_to_anchor=(1.35, 1.10), fontsize=5)
+    st.pyplot(fig, use_container_width=False)
 
     st.caption(
         f"스케일: **{scaling_method}**, 참조: **{scope}** "
@@ -538,7 +620,7 @@ def _plot_heatmap(
         return
 
     fig_h, ax = plt.subplots(
-        figsize=(1.0 * len(col_inds) + 6, 0.45 * max(len(pivot.index), 6) + 3)
+        figsize=(0.7 * len(col_inds) + 3, 0.35 * max(len(pivot.index), 6) + 2)
     )
     im = ax.imshow(pivot.values, aspect="auto", cmap="RdYlGn")
 
@@ -550,7 +632,6 @@ def _plot_heatmap(
     ax.set_yticks(np.arange(len(pivot.index)))
     ax.set_yticklabels(pivot.index, fontsize=10)
 
-    ax.set_title("상권(행정동) × 업종_매핑 — 평균 추천점수(근사)", fontsize=13, fontweight="bold", pad=10)
     cbar = plt.colorbar(im, ax=ax); cbar.set_label("추천점수(근사, 높을수록 우수)", fontsize=10, fontweight="bold")
 
     if len(pivot.index) * len(pivot.columns) <= 600:
