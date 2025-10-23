@@ -15,6 +15,24 @@ from mbti_classifier import classify_merchant_mbti
 from visualization_area import render_area_dashboard
 from clustering import get_dtw_cluster, build_dtw_report
 
+def load_area_cluster_data():
+    """area_cluster.csv 파일을 로드하는 캐시 함수"""
+    # data_dong.csv가 있는 폴더(FIXED_DATA_PATH) 기준으로 area_cluster.csv 경로 설정
+    cluster_file_path = os.path.join(os.path.dirname(FIXED_DATA_PATH), "area_clustering.csv")
+    
+    if not os.path.exists(cluster_file_path):
+        st.error(f"❌ 'area_cluster.csv' 파일을 찾을 수 없습니다. 경로: {cluster_file_path}")
+        return None
+    try:
+        # area_cluster.csv 파일 인코딩에 맞게 'utf-8' 또는 'cp949' 시도
+        df = pd.read_csv(cluster_file_path, encoding='utf-8')
+    except UnicodeDecodeError:
+        df = pd.read_csv(cluster_file_path, encoding='cp949')
+    except Exception as e:
+        st.error(f"❌ 'area_cluster.csv' 로드 중 오류: {e}")
+        return None
+    return df
+
 @st.cache_resource(ttl=3600)
 def cached_load_data(path):
     """Streamlit 캐싱을 적용한 데이터 로드 함수"""
@@ -46,6 +64,59 @@ def create_docx_report(mct_id, proposal, chat_history):
             p.add_run(message['content'])
             doc.add_paragraph()
             
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    return buffer.getvalue()
+
+def create_cluster_report_docx(
+    mct_id: str,
+    h_dong: str,
+    industry_name: str,
+    selected_industry_mapped: str,
+    cluster_text: str,
+    similar_dong_sentence: str,
+    cluster_description: str,
+    all_desc: str
+) -> bytes:
+    """업장 보고서(상권 클러스터) 탭의 내용을 Word 문서로 생성하여 바이트 객체로 반환"""
+    doc = Document()
+    doc.add_heading(f"'{mct_id}' 가맹점 상권(업장) 분석 리포트", level=1)
+    doc.add_paragraph()
+
+    # 1. 핵심 분석 결과
+    doc.add_heading("📌 핵심 분석 결과", level=2)
+    
+    # h_dong, industry_name 등 주요 정보를 굵게 처리
+    p1 = doc.add_paragraph()
+    p1.add_run(f"점주님의 업장 (").bold = False
+    p1.add_run(f"{h_dong}, {industry_name}").bold = True
+    p1.add_run(f")은(는) ").bold = False
+    p1.add_run(f"[{selected_industry_mapped}-{cluster_text}]").bold = True
+    p1.add_run("에 해당합니다.").bold = False
+    
+    # 유사 행정동 문장 (굵게 처리된 마크다운 제거)
+    if similar_dong_sentence:
+        clean_sentence = similar_dong_sentence.replace("**", "") # 마크다운 ** 제거
+        clean_sentence = clean_sentence.replace("[", "").replace("]", "") # [ ] 제거
+        doc.add_paragraph(clean_sentence)
+        
+    doc.add_paragraph() # 여백
+
+    # 2. 상세 분석 (해당 클러스터)
+    if cluster_description:
+        doc.add_heading(f"➡️ {cluster_text} 상세 분석", level=2)
+        # 텍스트 파일의 줄바꿈(개행)을 docx에 반영
+        for line in cluster_description.split('\n'):
+            doc.add_paragraph(line)
+        doc.add_paragraph() # 여백
+
+    # 3. 업종 전체 요약
+    if all_desc:
+        doc.add_heading(f"'{selected_industry_mapped}' 업종 전체 요약", level=2)
+        for line in all_desc.split('\n'):
+            doc.add_paragraph(line)
+            
+    # 버퍼에 저장하여 반환
     buffer = io.BytesIO()
     doc.save(buffer)
     return buffer.getvalue()
@@ -223,54 +294,271 @@ def main():
     persona = analysis_result["persona"]
     mbti_result = analysis_result["mbti"]
     mct_data = analysis_result["raw_data"]
-
+   
     with tab_clu:
-        # 선택된 가맹점 이름 가져오기 (없으면 ID로 대체)
-        mct_row = df_profile.loc[df_profile["ENCODED_MCT"] == selected_mct]
-        merchant_name = (
-            mct_row["MCT_NM"].iloc[0]
-            if ("MCT_NM" in mct_row.columns and not mct_row.empty and pd.notna(mct_row["MCT_NM"].iloc[0]))
-            else str(selected_mct)
-        )
-
-        # 클러스터 찾기
-        cluster_id = get_dtw_cluster(selected_mct)
-        if cluster_id is None:
-            st.info("이 가맹점은 아직 DTW 군집이 매핑되어 있지 않음..")
+        # 1. area_cluster.csv에서 사용할 업종명 매핑
+        INDUSTRY_MAP = {
+            "🍗 고기집 🍗": "고기집",
+            "🍎 식료품 🍎": "식료품",
+            "🥐 베이커리 🥐": "베이커리",
+            "🍺 술집 🍺": "술집",
+            "🍝 양식음식점 🍝": "양식음식점",
+            "🍣 일식음식점 🍣": "일식음식점",
+            "👲 중식음식점 👲": "중식음식점",
+            "🍔 패스트푸드점 🍔": "패스트푸드점",
+            "🍚 한식음식점 🍚": "한식음식점"
+        }
+        
+        # 2. 클러스터 데이터 로드
+        df_area_cluster = load_area_cluster_data()
+        if df_area_cluster is None:
+            st.error("'area_cluster.csv' 로드에 실패하여 업장 보고서를 표시할 수 없습니다.")
             st.stop()
 
-        # 리포트 생성 (clustering.py에서 문구/이미지 경로 구성)
-        report = build_dtw_report(selected_mct, merchant_name)
+        # 3. 가맹점 기본 정보(행정동, 업종명) 추출
+        try:
+            mct_row = df_profile.loc[df_profile["ENCODED_MCT"] == selected_mct].iloc[0]
+            h_name = mct_row.get("h_name", "정보없음")
+            h_dong = h_name.split(' ')[-1] # 행정동
+            industry_name = mct_row.get("HPSN_MCT_ZCD_NM", "정보없음") # 업종
 
-        # 헤더/인트로
-        st.subheader(report["intro_title"])
-        st.markdown(
-    f"<p style='font-size:1.1rem; line-height:1.6; font-weight:500;'>{report['intro_body']}</p>",
-    unsafe_allow_html=True
-)
+        except IndexError:
+            st.error("선택한 가맹점의 기본 정보(h_name, 업종)를 찾을 수 없습니다.")
+            st.stop()
+        except Exception as e:
+            st.error(f"가맹점 정보 처리 중 오류: {e}")
+            st.stop()
+            
+        # 4. 사용자에게 비교 업종 선택받기
+        st.subheader(f"점주님의 업장 ({industry_name})이 위치한 [{h_dong}]의 상권 특성을 비교 분석합니다.")
+        
+        # 4-1. 선택 옵션 리스트에 안내 문구 추가
+        industry_options = ["-- 점주님의 업종을 선택하세요 --"] + list(INDUSTRY_MAP.keys())
 
-        # 클러스터 뱃지 느낌
-        badge = report["cluster_badge"]
-        st.markdown(f"{badge['icon']} **{badge['name']}**", unsafe_allow_html=True)
+        selected_industry_emoji = st.selectbox(
+            "👇 업종을 선택하면, 아래에 상권 분석 결과가 표시됩니다 ",
+            industry_options,
+            index=0, # 기본값으로 0번째(-- 선택하세요 --)를 지정
+            key="area_cluster_industry_select"
+        )
+        
+        # --- ⬇️ 업종이 선택되었을 때만 하단 내용 표시 ---
+        if selected_industry_emoji != "-- 점주님의 업종을 선택하세요 --":
+            
+            # 4-2. 선택된 경우에만 매핑 수행
+            selected_industry_mapped = INDUSTRY_MAP[selected_industry_emoji]
 
-        # 패턴/해석/주요 업종
-        with st.container(border=True):
-            st.markdown("**패턴 분석**")
-            for line in report["pattern"]:
-                st.markdown(f"- {line}")
-            st.markdown("**해석**")
-            st.write(report["interpretation"])
-            st.markdown("**주요 업종**")
-            st.write(report["key_industries"])
+            # 5. 클러스터 번호 및 유사 행정동 찾기 (들여쓰기)
+            cluster_text = "클러스터 정보 없음"
+            similar_dong_sentence = "" 
+            cluster_num = None 
+            cluster_description = "" # DOCX용 변수 초기화
+            all_desc = ""            # DOCX용 변수 초기화
+            
+            try:
+                cluster_row = df_area_cluster[
+                    (df_area_cluster['서비스_업종_코드_명'] == selected_industry_mapped) &
+                    (df_area_cluster['행정동_코드_명'] == h_dong)
+                ]
 
-        # 미리 만든 그래프 이미지가 있으면 표시 (예: static/cluster_{id}_top10.png)
-        if "chart_path" in report and os.path.exists(report["chart_path"]):
-            st.image(report["chart_path"], caption="동군집 내 상위 10개 업종 분포", use_column_width=True)
+                if not cluster_row.empty:
+                    cluster_num = cluster_row['area_cluster'].iloc[0] 
+                    cluster_text = f"Cluster {cluster_num}"
+
+                    # ... (유사 행정동 찾기 로직) ...
+                    similar_dongs_df = df_area_cluster[
+                        (df_area_cluster['area_cluster'] == cluster_num) &
+                        (df_area_cluster['서비스_업종_코드_명'] == selected_industry_mapped)
+                    ]
+                    similar_dongs_list = similar_dongs_df['행정동_코드_명'].unique().tolist()
+                    similar_dongs_list = [dong for dong in similar_dongs_list if dong != h_dong]
+                    
+                    if similar_dongs_list:
+                        similar_dongs_str = ", ".join(similar_dongs_list)
+                        similar_dong_sentence = f"[{h_dong}]과 유사한 추이를 보이는 행정동으로는 [{similar_dongs_str}]이 있습니다."
+                    else:
+                        similar_dong_sentence = f"[{h_dong}]과 유사한 추이를 보이는 다른 행정동이 없습니다."
+
+                else:
+                    st.warning(f"참고: '{h_dong}'의 '{selected_industry_mapped}' 업종에 대한 클러스터 정보가 'area_cluster.csv'에 없습니다.")
+
+            except KeyError as e:
+                st.error(f"'area_cluster.csv' 파일에 필요한 컬럼({e})이 없습니다. (서비스_업종_코드_명, 행정동_코드_명, area_cluster)")
+                cluster_text = "오류"
+            except Exception as e:
+                st.error(f"클러스터 조회 중 오류: {e}")
+                cluster_text = "오류"
+
+            # 6. 최종 결과 문구 표시
+            st.markdown("---")
+            st.markdown(f"점주님의 업장은 [{h_dong}]에 위치한 [{industry_name}] 이며, **[{selected_industry_mapped}-{cluster_text}]**에 해당합니다.")
+            
+            # 7. 유사 행정동 문장 출력
+            if similar_dong_sentence: 
+                st.markdown(similar_dong_sentence)
+            
+            # 8-1. 업종 전체 클러스터 요약 (cluster.txt) 및 이미지 표시
+            st.markdown("---") 
+            st.markdown(f"### 점주님의 업장이 속한 **[{selected_industry_mapped} - {cluster_text}]**의 특징을 알아볼까요?😊")
+            
+
+            cluster_summary_path = f"./text/{selected_industry_mapped}/cluster.txt"
+            if os.path.exists(cluster_summary_path):
+                try:
+                    with open(cluster_summary_path, 'r', encoding='utf-8') as f:
+                        cluster_summary_desc = f.read()
+                except UnicodeDecodeError:
+                    with open(cluster_summary_path, 'r', encoding='cp949') as f:
+                        cluster_summary_desc = f.read()
+                except Exception as e:
+                    cluster_summary_desc = f"파일 로드 오류: {e}"
+                
+                # st.subheader(f"'{selected_industry_mapped}' 업종 클러스터 요약") # 제목이 필요하면 주석 해제
+                st.markdown(cluster_summary_desc) # 요약 텍스트 표시
+            else:
+                 st.caption(f"[클러스터 요약 없음: {cluster_summary_path}]")
+                
+                
+            image_path = f"./image/{selected_industry_mapped}.png"
+            if os.path.exists(image_path):
+                st.image(image_path, caption=f"'{selected_industry_mapped}' 업종 클러스터 분포")
+            else:
+                st.caption(f"[이미지 없음: {image_path}]") 
+
+            # 8-2. 특정 클러스터 분석 텍스트 표시
+            if cluster_num is not None: 
+                text_path = f"./text/{selected_industry_mapped}/cluster{cluster_num}.txt"
+                if os.path.exists(text_path):
+                    try:
+                        with open(text_path, 'r', encoding='utf-8') as f:
+                            cluster_description = f.read() # 변수에 저장
+                    except UnicodeDecodeError:
+                        with open(text_path, 'r', encoding='cp949') as f:
+                            cluster_description = f.read() # 변수에 저장
+                    except Exception as e:
+                        cluster_description = f"텍스트 파일 로드 오류: {e}"
+                    
+                    st.subheader(f"➡️ {cluster_text} 상세 분석")
+                    st.markdown(cluster_description)
+                else:
+                    st.caption(f"[분석 내용 없음: {text_path}]")
+                
+                # ... (다른 클러스터 토글 로직) ...
+                with st.expander(f"다른 '{selected_industry_mapped}' 클러스터 유형 살펴보기"):
+                    all_cluster_nums = sorted(df_area_cluster[
+                        df_area_cluster['서비스_업종_코드_명'] == selected_industry_mapped
+                    ]['area_cluster'].unique())
+                    
+                    found_other = False
+                    for c_num in all_cluster_nums:
+                        if c_num == cluster_num: continue
+                        found_other = True
+                        other_text_path = f"./text/{selected_industry_mapped}/cluster{c_num}.txt"
+                        if os.path.exists(other_text_path):
+                            try:
+                                with open(other_text_path, 'r', encoding='utf-8') as f: other_desc = f.read()
+                            except UnicodeDecodeError:
+                                with open(other_text_path, 'r', encoding='cp949') as f: other_desc = f.read()
+                            except Exception as e: other_desc = f"파일 로드 오류: {e}"
+                            st.markdown("---"); st.subheader(f"Cluster {c_num} 분석"); st.markdown(other_desc)
+                        else:
+                            st.caption(f"[분석 내용 없음: {other_text_path}]")
+                    if not found_other: st.caption("다른 클러스터 정보가 없습니다.")
+            else: 
+                st.caption(f"[클러스터 정보 없음: '{h_dong}'의 '{selected_industry_mapped}' 데이터 확인 필요]")
+
+            # 8-3. 업종별 all.txt 파일 불러오기
+            st.markdown("---")
+            all_text_path = f"./text/{selected_industry_mapped}/all.txt"
+            if os.path.exists(all_text_path):
+                st.subheader(f"'{selected_industry_mapped}' 업종 전체 요약")
+                try:
+                    with open(all_text_path, 'r', encoding='utf-8') as f:
+                        all_desc = f.read() # 변수에 저장
+                except UnicodeDecodeError:
+                    with open(all_text_path, 'r', encoding='cp949') as f:
+                        all_desc = f.read() # 변수에 저장
+                except Exception as e:
+                    all_desc = f"파일 로드 오류: {e}"
+                
+                st.markdown(all_desc)
+            else:
+                st.caption(f"[전체 요약 없음: {all_text_path}]")
+
+            # 9. DOCX 다운로드 버튼
+            st.markdown("---") # 구분선
+            
+            # DOCX 데이터 생성
+            docx_data_clu = create_cluster_report_docx(
+                mct_id=selected_mct,
+                h_dong=h_dong,
+                industry_name=industry_name,
+                selected_industry_mapped=selected_industry_mapped,
+                cluster_text=cluster_text,
+                similar_dong_sentence=similar_dong_sentence,
+                cluster_description=cluster_description,
+                all_desc=all_desc
+            )
+            
+            st.download_button(
+                label="📄 상권(업장) 분석 내용 저장하기 (.docx)",
+                data=docx_data_clu,
+                file_name=f"report_area_{selected_mct}_{selected_industry_mapped}.docx", 
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                key="docx_download_clu"
+            )
+        
         else:
-            st.caption("차트 이미지가 준비되지 않았음.. (static 폴더 경로/파일명 확인)")
+            # 4-3. 업종이 선택되지 않았을 때
+            st.markdown("")
 
-        # 메타
-        st.caption(f"모델: {report['meta']['model_ver']} · 소스: {report['meta']['data_source']}")
+#     with tab_clu:
+#         # 선택된 가맹점 이름 가져오기 (없으면 ID로 대체)
+#         mct_row = df_profile.loc[df_profile["ENCODED_MCT"] == selected_mct]
+#         merchant_name = (
+#             mct_row["MCT_NM"].iloc[0]
+#             if ("MCT_NM" in mct_row.columns and not mct_row.empty and pd.notna(mct_row["MCT_NM"].iloc[0]))
+#             else str(selected_mct)
+#         )
+
+#         # 클러스터 찾기
+#         cluster_id = get_dtw_cluster(selected_mct)
+#         if cluster_id is None:
+#             st.info("이 가맹점은 아직 DTW 군집이 매핑되어 있지 않음..")
+#             st.stop()
+
+#         # 리포트 생성 (clustering.py에서 문구/이미지 경로 구성)
+#         report = build_dtw_report(selected_mct, merchant_name)
+
+#         # 헤더/인트로
+#         st.subheader(report["intro_title"])
+#         st.markdown(
+#     f"<p style='font-size:1.1rem; line-height:1.6; font-weight:500;'>{report['intro_body']}</p>",
+#     unsafe_allow_html=True
+# )
+
+#         # 클러스터 뱃지 느낌
+#         badge = report["cluster_badge"]
+#         st.markdown(f"{badge['icon']} **{badge['name']}**", unsafe_allow_html=True)
+
+#         # 패턴/해석/주요 업종
+#         with st.container(border=True):
+#             st.markdown("**패턴 분석**")
+#             for line in report["pattern"]:
+#                 st.markdown(f"- {line}")
+#             st.markdown("**해석**")
+#             st.write(report["interpretation"])
+#             st.markdown("**주요 업종**")
+#             st.write(report["key_industries"])
+
+#         # 미리 만든 그래프 이미지가 있으면 표시 (예: static/cluster_{id}_top10.png)
+#         if "chart_path" in report and os.path.exists(report["chart_path"]):
+#             st.image(report["chart_path"], caption="동군집 내 상위 10개 업종 분포", use_column_width=True)
+#         else:
+#             st.caption("차트 이미지가 준비되지 않았음.. (static 폴더 경로/파일명 확인)")
+
+#         # 메타
+#         st.caption(f"모델: {report['meta']['model_ver']} · 소스: {report['meta']['data_source']}")
 
 
     with tab_area:
