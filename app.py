@@ -7,8 +7,6 @@ import os
 import io
 from docx import Document
 import time
-
-# --- 모듈에서 필요한 함수와 상수를 가져옵니다 --- #
 from data_processor import load_fixed_data, analyze_merchant, FIXED_DATA_PATH
 from gemini_api import generate_marketing_text_with_gemini, generate_chat_response_with_gemini
 from visualize import load_data
