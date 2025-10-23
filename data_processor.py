@@ -1,5 +1,3 @@
-# data_processor.property
-
 import pandas as pd
 import numpy as np
 import os
