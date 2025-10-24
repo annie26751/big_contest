@@ -147,7 +147,7 @@ def create_persona(merchant_row: pd.Series, analysis_summary: Dict[str, Any]) ->
     # 6. 페르소나 종합 정보 생성
     persona_description = (
     f"<b>{name}</b> 님은 <b>{age_group} {gender}</b> 으로, 직업은 <b>{job}</b> 입니다. "
-    f"주로 '<b>{info.get('h_name', info.get('HPSN_MCT_BZN_CD_NM'))})</b>' 상권에서 활동하며, "
+    f"주로 '<b>{info.get('h_name', info.get('HPSN_MCT_BZN_CD_NM'))}</b>' 상권에서 활동하며, "
     f"가게의 전체 고객 중 <b>{analysis_summary['dominant_ag_ratio']:.1f}%</b> 를 차지하는 핵심 고객 그룹을 대표합니다."
 )
     
