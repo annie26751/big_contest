@@ -96,7 +96,7 @@ def create_cluster_report_docx(
     
     # 유사 행정동 문장 (굵게 처리된 마크다운 제거)
     if similar_dong_sentence:
-        clean_sentence = similar_dong_sentence.replace("**", "") # 마크다운 ** 제거
+        clean_sentence = similar_dong_sentence.replace("", "") # 마크다운  제거
         clean_sentence = clean_sentence.replace("[", "").replace("]", "") # [ ] 제거
         doc.add_paragraph(clean_sentence)
         
@@ -205,15 +205,15 @@ def main():
         else:
             with st.sidebar.expander("📂 가게 정보", expanded=True):
                 status = "운영 중" if pd.isna(row.get("MCT_ME_D")) else f"폐업 ({row.get('MCT_ME_D')})"
-                st.markdown(f"**업종:** {row.get('HPSN_MCT_ZCD_NM')}")
-                st.markdown(f"**주소:** {row.get('MCT_BSE_AR')}")
-                st.markdown(f"**상권:** {row.get('h_name', row.get('HPSN_MCT_BZN_CD_NM'))}")
-                st.markdown(f"**상태:** {status}")
+                st.markdown(f"업종: {row.get('HPSN_MCT_ZCD_NM')}")
+                st.markdown(f"주소: {row.get('MCT_BSE_AR')}")
+                st.markdown(f"상권: {row.get('h_name', row.get('HPSN_MCT_BZN_CD_NM'))}")
+                st.markdown(f"상태: {status}")
 
             # MBTI(가게 유형) 분류 — 기존 UI 유지
             store_type = classify_merchant_mbti(row)
             with st.sidebar.expander("🏪 가게 유형 (MBTI)", expanded=True):
-                st.markdown(f"**{store_type['name']}**")
+                st.markdown(f"{store_type['name']}")
                 st.caption(store_type['description'])
     else:
         st.sidebar.info("가맹점을 선택하면 기본 정보와 가게 유형이 표시됩니다.")
@@ -396,14 +396,14 @@ def main():
 
             # 6. 최종 결과 문구 표시
             st.markdown("---")
-            st.markdown(f"점주님의 업장은 [{h_dong}]에 위치한 [{industry_name}] 이며, **[{selected_industry_mapped}-{cluster_text}]**에 해당합니다.")
+            st.markdown(f"점주님의 업장은 [{h_dong}]에 위치한 [{industry_name}] 이며, [{selected_industry_mapped}-{cluster_text}]에 해당합니다.")
             
             # 7. 유사 행정동 문장 출력
             if similar_dong_sentence: 
                 st.markdown(similar_dong_sentence)
             
             # 8-1. 업종 전체 클러스터 요약 (cluster.txt) 및 이미지 표시
-            st.markdown(f"### 점주님의 업장이 속한 **[{selected_industry_mapped} - {cluster_text}]**의 특징을 알아볼까요?😊")
+            st.markdown(f"### 점주님의 업장이 속한 [{selected_industry_mapped} - {cluster_text}]의 특징을 알아볼까요?😊")
             
 
             cluster_summary_path = f"./text/{selected_industry_mapped}/cluster.txt"
@@ -543,7 +543,7 @@ def main():
 
         # 클러스터 뱃지 느낌
         badge = report["cluster_badge"]
-        st.markdown(f"{badge['icon']} **{badge['name']}**", unsafe_allow_html=True)
+        st.markdown(f"{badge['icon']} {badge['name']}", unsafe_allow_html=True)
 
         # 패턴/해석/주요 업종
         with st.container(border=True):
@@ -555,7 +555,7 @@ def main():
         # 그래프 이미지
         imgs = report.get("images", [])
         if imgs:
-            st.markdown("**같은 그룹의 상위 10개 업종이에요**")
+            st.markdown("같은 그룹의 상위 10개 업종이에요")
             for p in imgs:
                 st.image(p, caption=os.path.basename(p), use_container_width=True)
         else:
@@ -614,9 +614,9 @@ def main():
 
         # 1. 데이터 기반 핵심 진단
         st.subheader("🤖 AI가 확인한 우리 가게의 현재 상태는?")
-        st.success(f"**[고객층 분석]** {summary['cust_analysis_text']}")
-        st.info(f"**[고객 유지력]** {summary['retention_analysis_text']}")
-        st.warning(f"**[경쟁 환경]** {summary['comp_analysis_text']}")
+        st.success(f"[고객층 분석] {summary['cust_analysis_text']}")
+        st.info(f"[고객 유지력] {summary['retention_analysis_text']}")
+        st.warning(f"[경쟁 환경] {summary['comp_analysis_text']}")
         st.markdown("---")
         
         # 2. 페르소나 분석 결과
@@ -738,7 +738,7 @@ def main():
             st.subheader("🤖 AI 마케팅 도구 추천")
             st.info("아래 도구들과 프롬프트 예시를 활용하여 마케팅 콘텐츠를 손쉽게 제작해보세요.")
 
-            reel_tab, blog_tab, image_tab = st.tabs(["🎬 **릴스/숏폼 제작**", "✍️ **블로그 포스팅**", "🎨 **이미지 생성**"])
+            reel_tab, blog_tab, image_tab = st.tabs(["🎬 릴스/숏폼 제작", "✍️ 블로그 포스팅", "🎨 이미지 생성"])
 
             with reel_tab:
                 st.markdown("""
@@ -746,28 +746,28 @@ def main():
                 텍스트만 입력하면 자동으로 이미지, 영상 클립, 더빙까지 생성해주는 영상 제작 도구입니다. 릴스나 쇼츠 콘텐츠를 제작해 보세요!
                 `https://vrew.voyagerx.com/`
                 """)
-                with st.expander("📝 **Vrew 활용 프롬프트 예시 펼쳐보기**"):
+                with st.expander("📝 Vrew 활용 프롬프트 예시 펼쳐보기"):
                     st.code(f"""
                     ### 릴스 대본 생성 프롬프트
 
-                    **역할:**
+                    역할:
                     당신은 '{summary['static_info'].get('HPSN_MCT_ZCD_NM')}' 가게를 운영하는 사장님 역할을 맡은 SNS 마케터입니다.
                     우리의 핵심 고객인 '{persona['name']}'의 관심을 끌 수 있는 30초 분량의 인스타그램 릴스 대본을 작성해주세요.
 
-                    **릴스 컨셉:**
+                    릴스 컨셉:
                     [사장님이 직접 가게의 매력을 소개하는 컨셉 / 고객이 직접 경험하는 듯한 1인칭 시점 컨셉 등]
 
-                    **핵심 메시지:**
+                    핵심 메시지:
                     '{persona['goals'][0]}' 와 같은 고객의 니즈를 충족시키고, '{persona['pain_points'][0]}' 같은 불편함을 해결해준다는 점을 강조해주세요.
 
-                    **포함할 내용:**
+                    포함할 내용:
                     - 시선을 사로잡는 오프닝 멘트 (3초 이내)
                     - 가게의 핵심 메뉴 또는 서비스 소개
                     - 고객에게 제공하는 특별한 혜택 (이벤트, 할인 등)
                     - 행동 유도 문구 (예: "지금 바로 프로필 링크를 확인하세요!")
                     - 영상 장면에 대한 간단한 설명 (예: #1. 음식이 클로즈업되는 장면)
 
-                    **분위기:**
+                    분위기:
                     [활기찬 / 감성적인 / 유머러스한] 분위기로 작성해주세요.
                     """, language="markdown")
 
@@ -782,24 +782,24 @@ def main():
                 게시물의 주제, 말투를 설정하면 블로그 글을 자동으로 완성해 드려요!  
                 `https://wrtn.ai/tools/67b2e7901b44a4d864b127a5`
                 """)
-                with st.expander("📝 **블로그 포스팅용 프롬프트 예시 펼쳐보기**"):
+                with st.expander("📝 블로그 포스팅용 프롬프트 예시 펼쳐보기"):
                     st.code(f"""
                     ### 블로그 포스트 생성 프롬프트
 
-                    **역할:**
+                    역할:
                     당신은 '{summary['static_info'].get('h_name', row.get('HPSN_MCT_BZN_CD_NM'))}' 상권의 맛집을 소개하는 전문 블로거입니다.
 
-                    **주제:**
+                    주제:
                     '{summary['static_info'].get('HPSN_MCT_ZCD_NM')}' 가게 방문 후기
 
-                    **타겟 독자:**
+                    타겟 독자:
                     '{persona['name']}' ({persona['description']})
 
-                    **글의 목적:**
+                    글의 목적:
                     타겟 독자가 이 글을 읽고 우리 가게에 방문하고 싶게 만드는 것.
                     특히, '{persona['goals'][0]}'와 같은 독자의 목표를 우리 가게가 어떻게 만족시켜주는지 자연스럽게 녹여내 주세요.
 
-                    **포함할 내용:**
+                    포함할 내용:
                     1.  독자의 흥미를 유발하는 제목 (SEO 키워드: [지역명] 맛집, [업종명])
                     2.  가게의 첫인상 및 분위기 묘사
                     3.  주문한 메뉴와 맛에 대한 상세한 설명
@@ -807,7 +807,7 @@ def main():
                     5.  가게 위치, 운영 시간, 팁 등 방문 정보
                     6.  독자의 방문을 유도하는 마무리 문단
 
-                    **글의 톤앤매너:**
+                    글의 톤앤매너:
                     [친근하고 솔직한 / 전문적이고 신뢰감 있는] 톤앤매너로 작성해주세요.
                     """, language="markdown")
 
@@ -827,14 +827,14 @@ def main():
                 `https://playground.com/design/c/logo`
                 """)
 
-                with st.expander("📝 **이미지 생성 프롬프트 예시 펼쳐보기**"):
+                with st.expander("📝 이미지 생성 프롬프트 예시 펼쳐보기"):
                     st.code(f"""
                     ### 마케팅 이미지 생성 프롬프트
 
-                    **스타일:**
+                    스타일:
                     [실사 사진 / 디지털 아트 / 수채화 / 애니메이션 스타일]
 
-                    **상세 설명:**
+                    상세 설명:
                     SNS 광고에 사용할 생동감 있고 매력적인 이미지.
                     '{summary['static_info'].get('HPSN_MCT_ZCD_NM')}' 식당에서 '{persona['name']}' 고객이 만족스럽게 식사를 즐기고 있는 장면.
                     '{persona['goals'][0]}'와 같은 기분을 느끼며 매우 만족스러워 보이는 표정.
@@ -842,7 +842,7 @@ def main():
                     메인 메뉴가 테이블 위에 아름답게 플레이팅 되어 있음.
                     디테일이 뛰어나고 따뜻하며 매력적인 조명에 초점을 맞출 것.
 
-                    **핵심 키워드:**
+                    핵심 키워드:
                     맛있는 음식, 행복한 고객, {summary['static_info'].get('h_name', row.get('HPSN_MCT_BZN_CD_NM'))}, 라이프스타일, 고품질
                     """, language="markdown")
 
