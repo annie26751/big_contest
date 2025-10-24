@@ -24,7 +24,7 @@ def generate_marketing_text_with_gemini(
     system_prompt = (
         "당신은 대한민국 소상공인을 위한 최고의 마케팅 컨설턴트 AI입니다. "
         "제공된 [가게 유형], [핵심 진단], [핵심 고객 페르소나] 정보를 종합적으로 분석하여, "
-        "가게 사장님이 **바로 실행할 수 있는 구체적이고 창의적인 마케팅 액션 플랜**을 제안해야 합니다. "
+        "가게 사장님이 바로 실행할 수 있는 구체적이고 창의적인 마케팅 액션 플랜을 제안해야 합니다. "
         "친절하고 이해하기 쉬운 전문가의 말투를 사용해주세요."
     )
 
@@ -36,9 +36,9 @@ def generate_marketing_text_with_gemini(
 
         persona_prompt_block = f"""
     #### [핵심 고객 페르소나 (사용자 직접 설정)]
-    - **타겟 성별:** {target_gender}
-    - **타겟 나이:** {target_age}
-    - **타겟 유형:** {target_type} 고객
+    - 타겟 성별: {target_gender}
+    - 타겟 나이: {target_age}
+    - 타겟 유형: {target_type} 고객
     
     (참고: 위 타겟은 사장님이 직접 선정한 '집중 공략 타겟'입니다. 이 고객의 니즈에 100% 맞춘 전략을 수립해주세요.)
     """
@@ -46,10 +46,10 @@ def generate_marketing_text_with_gemini(
         # 기본값 (데이터 기반 페르소나)
         persona_prompt_block = f"""
     #### [핵심 고객 페르소나 (데이터 기반)]
-    - **이름:** {persona_info['name']}
-    - **특징:** {persona_info['description']}
-    - **찾는 이유(Goals):** {', '.join(persona_info['goals'])}
-    - **어려움(Pain Points):** {', '.join(persona_info['pain_points'])}
+    - 이름: {persona_info['name']}
+    - 특징: {persona_info['description']}
+    - 찾는 이유(Goals): {', '.join(persona_info['goals'])}
+    - 어려움(Pain Points): {', '.join(persona_info['pain_points'])}
     """
 
     # 2. 사용자 프롬프트 
@@ -57,26 +57,26 @@ def generate_marketing_text_with_gemini(
     ### 분석 대상 가맹점: {mct_id}
 
     #### [가게 유형 분석]
-    - **우리 가게 유형:** {mbti_result['name']} ({mbti_result['description']})
+    - 우리 가게 유형: {mbti_result['name']} ({mbti_result['description']})
 
     #### [핵심 진단 결과]
-    - **고객층:** {analysis_summary['cust_analysis_text']}
-    - **고객 유지력:** {analysis_summary['retention_analysis_text']}
-    - **경쟁 환경:** {analysis_summary['comp_analysis_text']}
+    - 고객층: {analysis_summary['cust_analysis_text']}
+    - 고객 유지력: {analysis_summary['retention_analysis_text']}
+    - 경쟁 환경: {analysis_summary['comp_analysis_text']}
 
     {persona_prompt_block}  # 👈 [수정 3] 조건부로 생성된 프롬프트 블록을 여기에 삽입
 
     —
     ### [요청 사항]
-    위 모든 정보를 바탕으로, 이 가게의 **강점은 극대화**하고 **약점은 보완**할 수 있는 맞춤형 마케팅 전략을 아래 형식에 맞춰 제안해주세요.
+    위 모든 정보를 바탕으로, 이 가게의 강점은 극대화하고 약점은 보완할 수 있는 맞춤형 마케팅 전략을 아래 형식에 맞춰 제안해주세요.
 
-    **1. 한 줄 요약:** (우리 가게의 현재 상황과 나아갈 방향을 한 문장으로 요약)
-    **2. 데이터 기반 강점 및 약점 진단:** (데이터를 근거로 어떤 점이 강하고 약한지 분석)
-    **3. 맞춤형 마케팅 액션 플랜 (3가지):**
-        - **전략명:** (예: '점심시간 단골 확보를 위한 타임어택 이벤트')
-        - **데이터 근거:** (이 전략을 왜 제안하는지 데이터에 기반하여 설명)
-        - **실행 방법:** (사장님이 따라 할 수 있도록 구체적인 실행 방법 제시)
-        - **홍보 문구 예시:** (고객 페르소나의 눈길을 사로잡을 SNS 또는 문자 메시지 예시)
+    1. 한 줄 요약: (우리 가게의 현재 상황과 나아갈 방향을 한 문장으로 요약)
+    2. 데이터 기반 강점 및 약점 진단: (데이터를 근거로 어떤 점이 강하고 약한지 분석)
+    3. 맞춤형 마케팅 액션 플랜 (3가지):
+        - 전략명: (예: '점심시간 단골 확보를 위한 타임어택 이벤트')
+        - 데이터 근거: (이 전략을 왜 제안하는지 데이터에 기반하여 설명)
+        - 실행 방법: (사장님이 따라 할 수 있도록 구체적인 실행 방법 제시)
+        - 홍보 문구 예시: (고객 페르소나의 눈길을 사로잡을 SNS 또는 문자 메시지 예시)
     """
 
     # 3. API Payload 구성 및 호출 (단일 프롬프트)
@@ -100,8 +100,8 @@ def generate_marketing_text_with_gemini(
             # API 키 오류 또는 모델명 오류 시 상세 내용 출력
             error_details = result.get('error', {})
             if error_details:
-                return f"### 🚨 API 설정 오류\n- **코드:** {error_details.get('code')}\n- **메시지:** {error_details.get('message')}\n\nAPI 키가 유효한지, `{GEMINI_MODEL}` 모델을 사용할 권한이 있는지 확인하세요."
-            return f"### 🚨 API 응답 오류\n응답 형식에 'candidates'가 없습니다.\n\n**응답 내용:**\n```json\n{result}\n```"
+                return f"### 🚨 API 설정 오류\n- 코드: {error_details.get('code')}\n- 메시지: {error_details.get('message')}\n\nAPI 키가 유효한지, `{GEMINI_MODEL}` 모델을 사용할 권한이 있는지 확인하세요."
+            return f"### 🚨 API 응답 오류\n응답 형식에 'candidates'가 없습니다.\n\n응답 내용:\n```json\n{result}\n```"
 
     except requests.exceptions.RequestException as e:
         return f"🚨 API 호출 중 네트워크 오류가 발생했습니다: {e}"
@@ -155,7 +155,7 @@ def generate_chat_response_with_gemini(base_context: str, messages_history: List
             text = result['candidates'][0].get('content', {}).get('parts', [{}])[0].get('text', '오류: 응답 내용이 비어있습니다.')
             return text
         else:
-            return f"### 🚨 API 응답 오류\n(챗봇) 응답 형식에 'candidates'가 없습니다.\n\n**응답 내용:**\n```json\n{result}\n```"
+            return f"### 🚨 API 응답 오류\n(챗봇) 응답 형식에 'candidates'가 없습니다.\n\n응답 내용:\n```json\n{result}\n```"
 
     except requests.exceptions.RequestException as e:
         return f"🚨 (챗봇) API 호출 중 네트워크 오류가 발생했습니다: {e}"
