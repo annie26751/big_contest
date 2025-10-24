@@ -126,7 +126,7 @@ def main():
     st.set_page_config(layout="wide", page_title="💡 내 가게를 살리는 AI 비밀상담사")
     st.markdown("""
     <div style="background-color:#f0f2f6; padding: 1rem; border-radius: 10px; margin-bottom: 1rem;">
-    <h1 style="text-align: center; color: black; margin: 0; font-size: 2.5rem;">💡 내 가게를 살리는 AI 비밀상담사</h1>
+    <h1 style="text-align: center; color: black; margin: 0; font-size: 2.5rem;">💡 사장님 맞춤형 스타트, UP!</h1>
     </div>
     """, unsafe_allow_html=True)
     #st.markdown("데이터와 AI를 기반으로 우리 가게의 문제를 진단하고, 핵심 고객을 위한 맞춤 마케팅 전략을 찾아보세요.")
